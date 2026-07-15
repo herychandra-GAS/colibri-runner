@@ -9,30 +9,33 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root{
-    --navy-0:#0A0E17;
-    --navy-1:#10151F;
-    --navy-2:#161C29;
-    --navy-3:#1E2635;
-    --line:#2A3344;
-    --line-soft:#212938;
-    --ink:#E8ECF4;
-    --ink-dim:#8B96AC;
-    --ink-faint:#5B6579;
-    --amber:#F5A623;
-    --amber-dim:#B87A18;
-    --cyan:#3ED6D0;
-    --green:#4ADE80;
-    --red:#F2545B;
+    --bg:#060c18; --surface:#09111f; --surface2:#0d1828;
+    --border:#152035; --border2:#1e3050;
+    --ink:#c8d8ee; --ink-dim:#7a9abb; --ink-faint:#4a6888;
+    --amber:#f0a500; --amber-dim:#f0a50018;
+    --teal:#00c9a7; --teal-dim:#00c9a714;
+    --green:#4ade80; --green-dim:#4ade8014;
+    --rose:#fb7185; --rose-dim:#fb718514;
+    --blue:#38bdf8; --purple:#a78bfa;
+    --navy-0:var(--bg); --navy-1:var(--surface); --navy-2:var(--surface2); --navy-3:#122036;
+    --line:var(--border); --line-soft:var(--border);
+    --cyan:var(--teal); --red:var(--rose); --amber-dim2:#b87a18;
     --panel-w: 400px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
   body{
-    background:var(--navy-0);
+    background:var(--bg);
     color:var(--ink);
-    font-family:'Rajdhani',sans-serif;
+    font-family:'Barlow Condensed',sans-serif;
     font-weight:500;
     -webkit-font-smoothing:antialiased;
+    position:relative;
+  }
+  body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.3;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:40px 40px;
   }
   .display{font-family:'Barlow Condensed',sans-serif;font-weight:700;}
   .mono{font-family:'IBM Plex Mono',monospace;}
@@ -41,57 +44,68 @@
     letter-spacing:0.14em; text-transform:uppercase; font-size:10.5px; color:var(--ink-faint);
   }
 
-  #app{display:flex; height:100vh; overflow:hidden;}
-  #map{flex:1; height:100%; background:#111;}
-  #panel{
-    width:var(--panel-w); min-width:var(--panel-w);
-    height:100%; overflow-y:auto;
-    background:var(--navy-1);
-    background-image:
-      linear-gradient(var(--line-soft) 1px, transparent 1px),
-      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
-    background-size:40px 40px;
-    border-left:1px solid var(--line);
-    display:flex; flex-direction:column;
-  }
+  #app{display:flex; flex-direction:column; height:100vh; overflow:hidden; position:relative; z-index:1;}
 
   header.top{
-    padding:20px 22px 16px; border-bottom:1px solid var(--line);
+    padding:0 24px; height:56px; flex-shrink:0;
+    border-bottom:1px solid var(--border2);
+    background:linear-gradient(180deg,#0d1018 0%,var(--bg) 100%);
     display:flex; justify-content:space-between; align-items:center;
-    position:sticky; top:0; background:var(--navy-1); z-index:2;
+    position:relative; z-index:3;
   }
-  .brand{display:flex; align-items:center; gap:10px;}
+  .brand{display:flex; align-items:center; gap:12px;}
   .brand-mark{
-    width:32px;height:32px;border-radius:6px; background:var(--navy-3);
-    border:1px solid var(--amber-dim); color:var(--amber);
+    width:30px;height:30px;border-radius:6px; background:var(--surface2);
+    border:1px solid var(--amber-dim2); color:var(--amber);
     display:flex;align-items:center;justify-content:center;
-    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px;
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px;
   }
-  .brand-name{font-size:14px; font-weight:600; color:var(--ink); letter-spacing:0.02em;}
+  .brand-name{font-size:13.5px; font-weight:600; color:var(--ink); letter-spacing:0.1em; text-transform:uppercase;}
+  .logo-dot{width:7px;height:7px;background:var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amber);animation:pdot 2s ease-in-out infinite; flex-shrink:0;}
+  @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 8px var(--amber);}50%{opacity:.5;box-shadow:0 0 16px var(--amber);}}
+  .hd{width:1px;height:26px;background:var(--border2); flex-shrink:0;}
+
   .new-task-btn{
-    background:var(--amber); color:var(--navy-0); border:none; border-radius:6px;
-    padding:9px 14px; font-family:'Barlow Condensed',sans-serif; font-weight:600;
-    font-size:13.5px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;
+    background:var(--amber); color:var(--bg); border:none; border-radius:5px;
+    padding:8px 14px; font-family:'Barlow Condensed',sans-serif; font-weight:600;
+    font-size:12.5px; cursor:pointer; text-transform:uppercase; letter-spacing:0.08em;
   }
   .new-task-btn:active{transform:scale(0.97);}
   .logout-btn{
-    background:transparent; color:var(--ink-faint); font-size:11.5px;
-    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 10px;
-    text-transform:uppercase; border:1px solid var(--line); border-radius:6px; cursor:pointer;
+    background:transparent; color:var(--ink-faint); font-size:10.5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.08em; padding:6px 10px;
+    text-transform:uppercase; border:1px solid var(--border2); border-radius:4px; cursor:pointer;
   }
   .logout-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
 
+  #body-split{display:flex; flex:1; min-height:0;}
+
+  #map-wrap{
+    flex:1; min-width:0; padding:16px 0 16px 16px; display:flex;
+  }
+  #map{
+    width:100%; height:100%; background:#111;
+    border:1px solid var(--border2); border-radius:8px; overflow:hidden;
+  }
+
+  #panel{
+    width:var(--panel-w); min-width:var(--panel-w);
+    height:100%; overflow-y:auto;
+    background:var(--surface);
+    display:flex; flex-direction:column;
+  }
+
   .roster{
     display:flex; gap:8px; padding:14px 22px; overflow-x:auto;
-    border-bottom:1px solid var(--line);
+    border-bottom:1px solid var(--border2); flex-shrink:0;
   }
   .roster-chip{
     flex-shrink:0; display:flex; align-items:center; gap:7px;
-    background:var(--navy-2); border:1px solid var(--line); border-radius:100px;
+    background:var(--surface2); border:1px solid var(--border2); border-radius:100px;
     padding:6px 12px 6px 6px; font-size:12.5px; cursor:pointer;
     transition:border-color 0.15s ease; color:var(--ink-dim);
   }
-  .roster-chip.selected{border-color:var(--amber); color:var(--ink);}
+  .roster-chip.selected{border-color:var(--amber); color:var(--ink); background:var(--amber-dim);}
   .roster-avatar{
     width:22px;height:22px;border-radius:50%; background:var(--navy-3);
     display:flex;align-items:center;justify-content:center;
@@ -124,7 +138,13 @@
   .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
   .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
   .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
   .task-row-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .task-row-notes{
+    font-size:12px; color:var(--ink-dim); margin-top:6px; padding:6px 9px;
+    background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
+    font-style:italic; line-height:1.4;
+  }
   .task-row-actions{margin-top:8px; display:flex; gap:6px;}
   .task-row-actions button{
     font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
@@ -151,12 +171,30 @@
     font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.04em;
     text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; display:block;
   }
-  .modal input, .modal select{
+  .modal input, .modal select, .modal textarea{
     width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:6px;
     font-family:'IBM Plex Mono',monospace; font-size:13.5px; margin-bottom:14px;
     background:var(--navy-2); color:var(--ink);
   }
-  .modal input:focus, .modal select:focus{outline:none; border-color:var(--amber);}
+  .modal textarea{resize:vertical; min-height:60px; max-height:160px; line-height:1.4;}
+  .modal input::placeholder, .modal textarea::placeholder{color:var(--ink-faint);}
+  .modal input:focus, .modal select:focus, .modal textarea:focus{outline:none; border-color:var(--amber);}
+
+  .urgency-toggle{display:flex; gap:8px; margin-bottom:14px;}
+  .urgency-btn{
+    flex:1; padding:10px; border-radius:6px; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+    background:var(--navy-2); border:1px solid var(--line); color:var(--ink-dim);
+    transition:all 0.15s ease;
+  }
+  .urgency-btn[data-urgency="normal"].selected{
+    background:var(--teal-dim); border-color:rgba(0,201,167,0.4); color:var(--teal);
+  }
+  .urgency-btn[data-urgency="urgent"].selected{
+    background:var(--rose-dim); border-color:rgba(251,113,133,0.4); color:var(--rose);
+  }
+
   .modal-actions{display:flex; gap:8px; margin-top:6px;}
   .modal-actions button{
     flex:1; padding:12px; border-radius:6px; border:none; cursor:pointer;
@@ -175,6 +213,11 @@
   .leaflet-control-zoom a{
     background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
   }
+  .leaflet-control-attribution{
+    background:rgba(255,255,255,0.85) !important; color:#555 !important;
+  }
+  .leaflet-control-attribution a{ color:#333 !important; }
+</style>
 <style>
   .auth-screen{
     position:fixed; inset:0; z-index:100;
@@ -236,21 +279,23 @@
 </div>
 
 <div id="app" style="display:none;">
-  <div id="map"></div>
+  <header class="top">
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div class="brand-mark">C</div>
+      <div class="brand-name">Colibri Dispatch</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
+      <button class="new-task-btn" id="open-new-task">+ New task</button>
+    </div>
+  </header>
 
-  <div id="panel">
-    <header class="top">
-      <div class="brand">
-        <div class="brand-mark">C</div>
-        <div class="brand-name">COLIBRI DISPATCH</div>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
-        <button class="new-task-btn" id="open-new-task">+ New task</button>
-      </div>
-    </header>
+  <div id="body-split">
+    <div id="map-wrap"><div id="map"></div></div>
 
-    <div class="roster" id="roster"></div>
+    <div id="panel">
+      <div class="roster" id="roster"></div>
 
     <div class="list-section">
       <div class="eyebrow" style="margin:6px 0 10px;">Active manifest</div>
@@ -261,6 +306,7 @@
       <div id="done-list"></div>
     </div>
   </div>
+  </div>
 </div>
 
 <div class="modal-backdrop" id="modal-backdrop">
@@ -268,14 +314,26 @@
     <h2 class="display">New delivery</h2>
     <p class="sub">Assign an item to a runner.</p>
 
+    <label class="field-label">Name</label>
+    <input id="task-name" placeholder="e.g. Budi Santoso">
+
     <label class="field-label">Item / order</label>
     <input id="task-item" placeholder="e.g. Wedding invitation cards — 500 pcs">
 
     <label class="field-label">Delivery address</label>
     <input id="task-address" placeholder="e.g. Jl. Sisingamangaraja No. 12">
 
+    <label class="field-label">Urgency</label>
+    <div class="urgency-toggle" id="urgency-toggle">
+      <button type="button" class="urgency-btn selected" data-urgency="normal">Normal</button>
+      <button type="button" class="urgency-btn" data-urgency="urgent">Urgent</button>
+    </div>
+
     <label class="field-label">Assign to</label>
     <select id="task-assignee"></select>
+
+    <label class="field-label">Notes</label>
+    <textarea id="task-notes" placeholder="e.g. Call before arriving, leave with security if not home"></textarea>
 
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
@@ -325,9 +383,10 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors",
-  maxZoom: 19
+L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+  maxZoom: 20,
+  subdomains: "abcd"
 }).addTo(map);
 
 // Leaflet measures its container's size at init time. If the #app flex layout
@@ -550,13 +609,18 @@ const statusLabel = {
 
 function taskRowHTML(t){
   const assignee = employees[t.assignedTo]?.name || "Unassigned";
+  const isUrgent = t.urgency === "urgent";
   return `
     <div class="task-row status-${t.status}">
       <div class="task-row-top">
         <div class="task-row-item">${escapeHTML(t.item || "Unnamed item")}</div>
-        <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
+          <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+        </div>
       </div>
-      <div class="task-row-meta">${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+      <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+      ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
       ${t.status !== "delivered" ? `<div class="task-row-actions">
         <button data-reassign="${t.id}">Reassign</button>
       </div>` : ""}
@@ -576,10 +640,21 @@ const backdrop = document.getElementById("modal-backdrop");
 document.getElementById("open-new-task").addEventListener("click", () => backdrop.classList.add("open"));
 document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
 
+let selectedUrgency = "normal";
+document.querySelectorAll(".urgency-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedUrgency = btn.dataset.urgency;
+    document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b === btn));
+  });
+});
+
 document.getElementById("create-task").addEventListener("click", async () => {
+  const name = document.getElementById("task-name").value.trim();
   const item = document.getElementById("task-item").value.trim();
   const address = document.getElementById("task-address").value.trim();
   const assignedTo = document.getElementById("task-assignee").value;
+  const urgency = selectedUrgency;
+  const notes = document.getElementById("task-notes").value.trim();
 
   if (!item || !assignedTo){
     alert("Add an item and pick a runner before creating the task.");
@@ -587,14 +662,18 @@ document.getElementById("create-task").addEventListener("click", async () => {
   }
 
   await addDoc(collection(db, "tasks"), {
-    item, address, assignedTo,
+    name, item, address, assignedTo, urgency, notes,
     status: TASK_STATUS.PENDING,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
 
+  document.getElementById("task-name").value = "";
   document.getElementById("task-item").value = "";
   document.getElementById("task-address").value = "";
+  document.getElementById("task-notes").value = "";
+  selectedUrgency = "normal";
+  document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b.dataset.urgency === "normal"));
   backdrop.classList.remove("open");
 });
 

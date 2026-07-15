@@ -190,9 +190,9 @@
     background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
   }
   .leaflet-control-attribution{
-    background:rgba(9,17,31,0.75) !important; color:var(--ink-faint) !important;
+    background:rgba(255,255,255,0.85) !important; color:#555 !important;
   }
-  .leaflet-control-attribution a{ color:var(--ink-dim) !important; }
+  .leaflet-control-attribution a{ color:#333 !important; }
 </style>
 <style>
   .auth-screen{
@@ -347,7 +347,7 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
   attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
   maxZoom: 20,
   subdomains: "abcd"

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colibri Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-0:#0A0E17;
+    --navy-1:#10151F;
+    --navy-2:#161C29;
+    --navy-3:#1E2635;
+    --line:#2A3344;
+    --line-soft:#212938;
+    --ink:#E8ECF4;
+    --ink-dim:#8B96AC;
+    --ink-faint:#5B6579;
+    --amber:#F5A623;
+    --amber-dim:#B87A18;
+    --cyan:#3ED6D0;
+    --green:#4ADE80;
+    --red:#F2545B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
+  body{
+    background:var(--navy-0);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    color:var(--ink);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:500;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:500;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-size:11px;
+    color:var(--ink-faint);
+  }
+
+  .screen{display:none; min-height:100vh; flex-direction:column;}
+  .screen.active{display:flex;}
+
+  /* ---------- Login ---------- */
+  #login-screen{align-items:center; justify-content:center; padding:32px 24px;}
+  .login-card{width:100%; max-width:360px;}
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:36px;}
+  .brand-mark{
+    width:36px;height:36px;border-radius:6px;
+    background:var(--navy-3); border:1px solid var(--amber-dim);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:var(--amber);
+  }
+  .brand-name{font-size:15px; font-weight:600; letter-spacing:0.02em; color:var(--ink);}
+  .brand-sub{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint); letter-spacing:0.1em; text-transform:uppercase;}
+  h1.login-title{font-size:34px; margin:0 0 6px; line-height:1.05; color:var(--ink);}
+  .login-desc{color:var(--ink-dim); font-size:14px; margin:0 0 28px; line-height:1.5;}
+  input{
+    width:100%;
+    background:var(--navy-1);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px 16px;
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    margin-bottom:12px;
+    outline:none;
+    transition:border-color 0.15s ease;
+  }
+  input::placeholder{color:var(--ink-faint);}
+  input:focus{border-color:var(--amber);}
+  button{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    letter-spacing:0.03em;
+    cursor:pointer;
+    border:none;
+  }
+  .btn-primary{
+    width:100%;
+    background:var(--amber);
+    color:var(--navy-0);
+    padding:15px;
+    border-radius:6px;
+    font-size:17px;
+    margin-top:8px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .btn-primary:active{transform:scale(0.98);}
+  .btn-primary:disabled{opacity:0.5;}
+  .btn-google{
+    width:100%;
+    background:var(--ink);
+    color:var(--navy-0);
+    padding:14px;
+    border-radius:6px;
+    font-size:15px;
+    margin-top:8px;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    font-family:'Rajdhani',sans-serif; font-weight:600;
+  }
+  .btn-google:active{transform:scale(0.98);}
+  .btn-cancel-full{
+    width:100%;
+    background:var(--navy-2); border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:14px;
+    border-radius:6px;
+    font-size:14px;
+    margin-top:8px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .login-error{
+    color:var(--red);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    margin-top:12px;
+    min-height:18px;
+  }
+
+  /* ---------- Manifest screen ---------- */
+  #manifest-screen{}
+  .topbar{
+    background:var(--navy-1); border-bottom:1px solid var(--line);
+    padding:18px 20px 20px;
+    position:sticky; top:0; z-index:5;
+  }
+  .topbar-row{display:flex; justify-content:space-between; align-items:flex-start;}
+  .greet{font-size:24px; margin:2px 0 2px; color:var(--ink);}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:7px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:5px 10px; border-radius:4px;
+    background:var(--navy-2); border:1px solid rgba(74,222,128,0.3); color:var(--green);
+    margin-top:8px;
+  }
+  .status-dot{width:6px;height:6px;border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green);}
+  .status-pill.off{background:var(--navy-2); border-color:var(--line); color:var(--ink-faint);}
+  .status-pill.off .status-dot{background:var(--ink-faint); box-shadow:none;}
+  .logout-btn{
+    background:transparent; color:var(--ink-faint); font-size:11.5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 0;
+    text-transform:uppercase;
+  }
+
+  .manifest-body{padding:20px 16px 100px;}
+  .section-label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin:22px 4px 10px;
+  }
+  .count-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;
+    color:var(--ink-faint);
+  }
+
+  .task-card{
+    background:var(--navy-2);
+    border-radius:8px;
+    margin-bottom:12px;
+    position:relative;
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .task-card::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .task-card.status-pending::before{background:var(--amber);}
+  .task-card.status-in_progress::before{background:var(--cyan);}
+  .task-card.status-delivered::before{background:var(--green);}
+  .task-card.status-failed::before{background:var(--red);}
+
+  .task-inner{padding:16px 16px 16px 20px;}
+  .task-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .task-item{font-size:17px; font-weight:600; line-height:1.3; color:var(--ink);}
+  .task-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:10px;
+    letter-spacing:0.06em; text-transform:uppercase;
+    padding:4px 8px; border-radius:4px; white-space:nowrap; border:1px solid;
+  }
+  .badge-pending{background:rgba(245,166,35,0.1); color:var(--amber); border-color:rgba(245,166,35,0.35);}
+  .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
+  .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
+  .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+
+  .task-addr{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.4;}
+  .task-perf{
+    height:1px; margin:14px 0;
+    background-image:repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
+  }
+  .task-actions{display:flex; gap:8px;}
+  .task-actions button{
+    flex:1; padding:11px; border-radius:6px; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .act-start{background:var(--amber); color:var(--navy-0);}
+  .act-done{background:var(--green); color:var(--navy-0);}
+  .act-fail{background:transparent; color:var(--red); border:1px solid rgba(242,84,91,0.4) !important;}
+
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--ink-faint);
+  }
+  .empty-state .display{font-size:20px; margin-bottom:6px; color:var(--ink-dim);}
+  .empty-state p{font-size:13px; margin:0; font-family:'IBM Plex Mono',monospace;}
+
+  .loc-footer{
+    position:fixed; bottom:0; left:0; right:0;
+    background:rgba(16,21,31,0.95); backdrop-filter:blur(8px);
+    border-top:1px solid var(--line);
+    padding:12px 20px; padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px; color:var(--ink-dim);
+  }
+  .loc-pulse{
+    width:8px;height:8px;border-radius:50%; background:var(--green);
+    box-shadow:0 0 6px var(--green);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;} 50%{opacity:0.3;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .loc-pulse{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="screen active">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div>
+        <div class="brand-name">COLIBRI RUNNER</div>
+        <div class="brand-sub">Delivery Terminal</div>
+      </div>
+    </div>
+    <h1 class="login-title display">Clock in.</h1>
+    <p class="login-desc">Sign in with your Google account to see today's manifest.</p>
+    <button class="btn-google" id="google-login-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      <span>Sign in with Google</span>
+    </button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div id="denied-screen" class="screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark" style="border-color:var(--red); color:var(--red);">!</div>
+      <div>
+        <div class="brand-name">COLIBRI RUNNER</div>
+        <div class="brand-sub">Delivery Terminal</div>
+      </div>
+    </div>
+    <h1 class="login-title display" style="color:var(--red);">Not registered.</h1>
+    <p class="login-desc" id="denied-detail">This Google account isn't set up for access yet. Contact your dispatcher to get registered.</p>
+    <button class="btn-cancel-full" id="denied-back-btn">Try a different account</button>
+  </div>
+</div>
+
+<div id="manifest-screen" class="screen">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <div class="eyebrow">Today's manifest</div>
+        <div class="greet display" id="greet-name">—</div>
+        <div class="status-pill" id="loc-status-pill">
+          <div class="status-dot"></div>
+          <span id="loc-status-text">Location sharing on</span>
+        </div>
+      </div>
+      <button class="logout-btn" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="manifest-body">
+    <div class="section-label">
+      <span class="eyebrow">Active tasks</span>
+      <span class="count-badge mono" id="active-count">0</span>
+    </div>
+    <div id="active-tasks"></div>
+
+    <div class="section-label">
+      <span class="eyebrow">Completed today</span>
+      <span class="count-badge mono" id="done-count">0</span>
+    </div>
+    <div id="done-tasks"></div>
+  </div>
+
+  <div class="loc-footer">
+    <div class="loc-pulse" id="loc-pulse"></div>
+    <span id="loc-footer-text">Sending your location every 25s while this tab is open</span>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc,
+  collection, query, where, onSnapshot, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBHB_wRo6ebQHQ_bP38zK148rdZQ_LMY-Q",
+  authDomain: "colibri-runner-be3ca.firebaseapp.com",
+  projectId: "colibri-runner-be3ca",
+  storageBucket: "colibri-runner-be3ca.firebasestorage.app",
+  messagingSenderId: "178686518201",
+  appId: "1:178686518201:web:f452fa0d0d4673bbee0c68"
+};
+
+const TASK_STATUS = {
+  PENDING: "pending",
+  IN_PROGRESS: "in_progress",
+  DELIVERED: "delivered",
+  FAILED: "failed"
+};
+const LOCATION_PING_INTERVAL_MS = 25000;
+
+// Only these Google accounts are allowed in at all.
+// Being on this list does NOT set their role — that still comes from
+// their /employees/{uid} Firestore doc, created after their first sign-in.
+const ALLOWED_EMAILS = [
+  "hery.chandra@gmail.com",
+  "colibri.printing@gmail.com",
+  "angel7lee@gmail.com",
+  "mudacetak@gmail.com"
+];
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+let currentUser = null;
+let watchId = null;
+let pingIntervalId = null;
+let lastPosition = null;
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+document.getElementById("google-login-btn").addEventListener("click", async () => {
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  try {
+    await signInWithPopup(auth, googleProvider);
+    // onAuthStateChanged below handles the rest
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user"){
+      errEl.textContent = "Sign-in failed — please try again.";
+      console.error(e);
+    }
+  }
+});
+
+document.getElementById("denied-back-btn").addEventListener("click", async () => {
+  await signOut(auth);
+  showScreen("login-screen");
+});
+
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  stopLocationSharing();
+  await signOut(auth);
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    const email = (user.email || "").toLowerCase();
+    if (!ALLOWED_EMAILS.includes(email)){
+      document.getElementById("denied-detail").textContent =
+        "This Google account isn't on the access list. Contact your dispatcher.";
+      await signOut(auth);
+      showScreen("denied-screen");
+      return;
+    }
+
+    currentUser = user;
+    const empDoc = await getDoc(doc(db, "employees", user.uid));
+
+    if (!empDoc.exists()){
+      // Whitelisted email, but dispatcher hasn't finished registering this UID yet.
+      document.getElementById("denied-detail").innerHTML =
+        `Your account is allowed, but not fully set up yet.<br><br>Ask your dispatcher to register this UID:<br><span class="mono" style="color:var(--ink); word-break:break-all;">${user.uid}</span>`;
+      await signOut(auth);
+      showScreen("denied-screen");
+      return;
+    }
+
+    const name = empDoc.data().name || "Runner";
+    document.getElementById("greet-name").textContent = name;
+    showScreen("manifest-screen");
+    subscribeToTasks(user.uid);
+    startLocationSharing(user.uid);
+  } else {
+    currentUser = null;
+    if (!document.getElementById("denied-screen").classList.contains("active")){
+      showScreen("login-screen");
+    }
+  }
+});
+
+function subscribeToTasks(uid){
+  const q = query(collection(db, "tasks"), where("assignedTo", "==", uid));
+  onSnapshot(q, (snapshot) => {
+    const tasks = [];
+    snapshot.forEach(d => tasks.push({ id: d.id, ...d.data() }));
+    renderTasks(tasks);
+  }, (err) => {
+    console.error("Task subscription error:", err);
+  });
+}
+
+function renderTasks(tasks){
+  const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
+
+  active.sort((a,b) => (a.status === TASK_STATUS.IN_PROGRESS ? -1 : 1) - (b.status === TASK_STATUS.IN_PROGRESS ? -1 : 1));
+
+  document.getElementById("active-count").textContent = active.length;
+  document.getElementById("done-count").textContent = done.length;
+
+  document.getElementById("active-tasks").innerHTML = active.length
+    ? active.map(taskCardHTML).join("")
+    : `<div class="empty-state"><div class="display">All clear</div><p>No active tasks right now.</p></div>`;
+
+  document.getElementById("done-tasks").innerHTML = done.length
+    ? done.map(taskCardHTML).join("")
+    : `<div class="empty-state" style="padding:24px 20px;"><p>Nothing completed yet today.</p></div>`;
+
+  document.querySelectorAll("[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => handleTaskAction(btn.dataset.taskId, btn.dataset.action));
+  });
+}
+
+const statusLabel = {
+  [TASK_STATUS.PENDING]: "Pending",
+  [TASK_STATUS.IN_PROGRESS]: "In progress",
+  [TASK_STATUS.DELIVERED]: "Delivered",
+  [TASK_STATUS.FAILED]: "Failed"
+};
+
+function taskCardHTML(t){
+  const addr = t.address || "No address given";
+  const item = t.item || "Unnamed item";
+  let actions = "";
+  if (t.status === TASK_STATUS.PENDING){
+    actions = `<button class="act-start" data-task-id="${t.id}" data-action="start">Start delivery</button>`;
+  } else if (t.status === TASK_STATUS.IN_PROGRESS){
+    actions = `
+      <button class="act-fail" data-task-id="${t.id}" data-action="fail">Couldn't deliver</button>
+      <button class="act-done" data-task-id="${t.id}" data-action="done">Mark delivered</button>`;
+  }
+
+  return `
+    <div class="task-card status-${t.status}">
+      <div class="task-inner">
+        <div class="task-top">
+          <div class="task-item">${escapeHTML(item)}</div>
+          <div class="task-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+        </div>
+        <div class="task-addr">${escapeHTML(addr)}</div>
+        ${actions ? `<div class="task-perf"></div><div class="task-actions">${actions}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+function escapeHTML(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function handleTaskAction(taskId, action){
+  const ref = doc(db, "tasks", taskId);
+  try {
+    if (action === "start"){
+      await updateDoc(ref, { status: TASK_STATUS.IN_PROGRESS, updatedAt: serverTimestamp() });
+    } else if (action === "done"){
+      await updateDoc(ref, { status: TASK_STATUS.DELIVERED, updatedAt: serverTimestamp(), completedAt: serverTimestamp() });
+    } else if (action === "fail"){
+      await updateDoc(ref, { status: TASK_STATUS.FAILED, updatedAt: serverTimestamp(), completedAt: serverTimestamp() });
+    }
+  } catch (e) {
+    console.error("Failed to update task:", e);
+    alert("Couldn't update that task — check your connection and try again.");
+  }
+}
+
+function startLocationSharing(uid){
+  if (!("geolocation" in navigator)){
+    document.getElementById("loc-status-text").textContent = "Location not supported on this device";
+    document.getElementById("loc-status-pill").classList.add("off");
+    document.getElementById("loc-pulse").style.background = "var(--red)";
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => { lastPosition = pos; },
+    (err) => { console.warn("Geolocation watch error:", err); },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+  );
+
+  const pushLocation = async () => {
+    if (!lastPosition) return;
+    try {
+      await setDoc(doc(db, "locations", uid), {
+        lat: lastPosition.coords.latitude,
+        lng: lastPosition.coords.longitude,
+        accuracy: lastPosition.coords.accuracy,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Failed to push location:", e);
+    }
+  };
+
+  pushLocation();
+  pingIntervalId = setInterval(pushLocation, LOCATION_PING_INTERVAL_MS);
+
+  document.getElementById("loc-status-text").textContent = "Location sharing on";
+  document.getElementById("loc-status-pill").classList.remove("off");
+}
+
+function stopLocationSharing(){
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  if (pingIntervalId !== null) clearInterval(pingIntervalId);
+  watchId = null;
+  pingIntervalId = null;
+  lastPosition = null;
+}
+
+document.addEventListener("visibilitychange", () => {
+  const pill = document.getElementById("loc-status-pill");
+  const text = document.getElementById("loc-status-text");
+  if (!currentUser) return;
+  if (document.hidden){
+    text.textContent = "Paused — reopen the app to resume sharing";
+    pill.classList.add("off");
+  } else {
+    text.textContent = "Location sharing on";
+    pill.classList.remove("off");
+  }
+});
+</script>
+</body>
+</html>

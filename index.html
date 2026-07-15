@@ -189,6 +189,10 @@
   .leaflet-control-zoom a{
     background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
   }
+  .leaflet-control-attribution{
+    background:rgba(9,17,31,0.75) !important; color:var(--ink-faint) !important;
+  }
+  .leaflet-control-attribution a{ color:var(--ink-dim) !important; }
 </style>
 <style>
   .auth-screen{
@@ -343,9 +347,10 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors",
-  maxZoom: 19
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+  maxZoom: 20,
+  subdomains: "abcd"
 }).addTo(map);
 
 // Leaflet measures its container's size at init time. If the #app flex layout

@@ -194,8 +194,15 @@
   .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
   .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
   .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
 
   .task-addr{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.4;}
+  .task-recipient{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-faint); margin-top:3px;}
+  .task-notes{
+    font-size:13px; color:var(--ink-dim); margin-top:10px; padding:8px 10px;
+    background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
+    font-style:italic; line-height:1.4;
+  }
   .task-perf{
     height:1px; margin:14px 0;
     background-image:repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
@@ -436,7 +443,11 @@ function renderTasks(tasks){
   const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
   const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
 
-  active.sort((a,b) => (a.status === TASK_STATUS.IN_PROGRESS ? -1 : 1) - (b.status === TASK_STATUS.IN_PROGRESS ? -1 : 1));
+  active.sort((a,b) => {
+    const statusDiff = (a.status === TASK_STATUS.IN_PROGRESS ? -1 : 1) - (b.status === TASK_STATUS.IN_PROGRESS ? -1 : 1);
+    if (statusDiff !== 0) return statusDiff;
+    return (a.urgency === "urgent" ? -1 : 1) - (b.urgency === "urgent" ? -1 : 1);
+  });
 
   document.getElementById("active-count").textContent = active.length;
   document.getElementById("done-count").textContent = done.length;
@@ -464,6 +475,7 @@ const statusLabel = {
 function taskCardHTML(t){
   const addr = t.address || "No address given";
   const item = t.item || "Unnamed item";
+  const isUrgent = t.urgency === "urgent";
   let actions = "";
   if (t.status === TASK_STATUS.PENDING){
     actions = `<button class="act-start" data-task-id="${t.id}" data-action="start">Start delivery</button>`;
@@ -478,9 +490,14 @@ function taskCardHTML(t){
       <div class="task-inner">
         <div class="task-top">
           <div class="task-item">${escapeHTML(item)}</div>
-          <div class="task-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            ${isUrgent ? `<div class="task-badge badge-urgent">Urgent</div>` : ""}
+            <div class="task-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          </div>
         </div>
+        ${t.name ? `<div class="task-recipient">${escapeHTML(t.name)}</div>` : ""}
         <div class="task-addr">${escapeHTML(addr)}</div>
+        ${t.notes ? `<div class="task-notes">${escapeHTML(t.notes)}</div>` : ""}
         ${actions ? `<div class="task-perf"></div><div class="task-actions">${actions}</div>` : ""}
       </div>
     </div>`;

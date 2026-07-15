@@ -230,6 +230,30 @@
   .btn-cancel{background:var(--navy-3); color:var(--ink-dim);}
   .btn-create{background:var(--amber); color:var(--navy-0);}
 
+  .reassign-options{display:flex; flex-direction:column; gap:8px; margin-bottom:6px;}
+  .reassign-option{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px 12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink); cursor:pointer; text-align:left;
+    font-family:'Rajdhani',sans-serif; font-weight:600; font-size:14.5px;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .reassign-option:hover{border-color:var(--amber);}
+  .reassign-option.current{border-color:var(--amber); background:var(--amber-dim);}
+  .reassign-option-avatar{
+    width:26px;height:26px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+  }
+  .reassign-option-name{flex:1;}
+  .reassign-option-dot{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+  .reassign-option-dot.live{background:var(--green); box-shadow:0 0 5px var(--green);}
+  .reassign-option-dot.stale{background:var(--ink-faint);}
+  .reassign-option-tag{
+    font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.05em;
+    text-transform:uppercase; color:var(--amber); flex-shrink:0;
+  }
+
   .courier-label{
     font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px;
     background:var(--navy-1); color:var(--ink); padding:2px 6px; border-radius:4px;
@@ -375,6 +399,19 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
       <button class="btn-create" id="create-task">Create task</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="reassign-backdrop">
+  <div class="modal">
+    <h2 class="display">Reassign delivery</h2>
+    <p class="sub" id="reassign-sub">Choose a runner for this task.</p>
+
+    <div class="reassign-options" id="reassign-options"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="reassign-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -732,14 +769,57 @@ function taskRowHTML(t){
     </div>`;
 }
 
+const reassignBackdrop = document.getElementById("reassign-backdrop");
+let reassignTaskId = null;
+
 async function openReassignPrompt(taskId){
+  const t = tasksById[taskId];
+  if (!t) return;
+  reassignTaskId = taskId;
+
   const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
-  const names = ids.map(id => employees[id].name || id).join(", ");
-  const name = prompt(`Reassign to (${names}):`);
-  const targetId = ids.find(id => (employees[id].name || "").toLowerCase() === (name || "").toLowerCase());
-  if (!targetId) return;
-  await updateDoc(doc(db, "tasks", taskId), { assignedTo: targetId, status: TASK_STATUS.PENDING, updatedAt: serverTimestamp() });
+  const optionsEl = document.getElementById("reassign-options");
+
+  document.getElementById("reassign-sub").textContent = t.item
+    ? `Choose a runner for "${t.item}".`
+    : "Choose a runner for this task.";
+
+  optionsEl.innerHTML = ids.length
+    ? ids.map(id => {
+        const e = employees[id];
+        const initial = (e.name || "?").charAt(0).toUpperCase();
+        const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+        const isCurrent = id === t.assignedTo;
+        return `
+          <button type="button" class="reassign-option ${isCurrent ? 'current' : ''}" data-assign-id="${id}">
+            <div class="reassign-option-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
+            <span class="reassign-option-name">${escapeHTML(e.name || "Runner")}</span>
+            ${isCurrent ? `<span class="reassign-option-tag">Current</span>` : ""}
+            <div class="reassign-option-dot ${isLive ? 'live' : 'stale'}"></div>
+          </button>`;
+      }).join("")
+    : `<div class="empty-list">No runners available.</div>`;
+
+  optionsEl.querySelectorAll("[data-assign-id]").forEach(btn => {
+    btn.addEventListener("click", () => confirmReassign(btn.dataset.assignId));
+  });
+
+  reassignBackdrop.classList.add("open");
 }
+
+async function confirmReassign(targetId){
+  if (!reassignTaskId || !targetId) return;
+  await updateDoc(doc(db, "tasks", reassignTaskId), {
+    assignedTo: targetId, status: TASK_STATUS.PENDING, updatedAt: serverTimestamp()
+  });
+  reassignBackdrop.classList.remove("open");
+  reassignTaskId = null;
+}
+
+document.getElementById("reassign-cancel").addEventListener("click", () => {
+  reassignBackdrop.classList.remove("open");
+  reassignTaskId = null;
+});
 
 const backdrop = document.getElementById("modal-backdrop");
 let editingTaskId = null;

@@ -264,9 +264,9 @@
     background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
   }
   .leaflet-control-attribution{
-    background:rgba(255,255,255,0.85) !important; color:#555 !important;
+    background:rgba(9,17,31,0.75) !important; color:var(--ink-faint) !important;
   }
-  .leaflet-control-attribution a{ color:#333 !important; }
+  .leaflet-control-attribution a{ color:var(--ink-dim) !important; }
 </style>
 <style>
   .auth-screen{
@@ -457,11 +457,12 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
   attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
   maxZoom: 20,
   subdomains: "abcd"
 }).addTo(map);
+map.getPane("tilePane").style.filter = "brightness(1.9) contrast(0.85)";
 
 // Leaflet measures its container's size at init time. If the #app flex layout
 // or web fonts haven't finished painting yet, that measurement can come back

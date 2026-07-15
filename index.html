@@ -138,7 +138,13 @@
   .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
   .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
   .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
   .task-row-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .task-row-notes{
+    font-size:12px; color:var(--ink-dim); margin-top:6px; padding:6px 9px;
+    background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
+    font-style:italic; line-height:1.4;
+  }
   .task-row-actions{margin-top:8px; display:flex; gap:6px;}
   .task-row-actions button{
     font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
@@ -165,12 +171,30 @@
     font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.04em;
     text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; display:block;
   }
-  .modal input, .modal select{
+  .modal input, .modal select, .modal textarea{
     width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:6px;
     font-family:'IBM Plex Mono',monospace; font-size:13.5px; margin-bottom:14px;
     background:var(--navy-2); color:var(--ink);
   }
-  .modal input:focus, .modal select:focus{outline:none; border-color:var(--amber);}
+  .modal textarea{resize:vertical; min-height:60px; max-height:160px; line-height:1.4;}
+  .modal input::placeholder, .modal textarea::placeholder{color:var(--ink-faint);}
+  .modal input:focus, .modal select:focus, .modal textarea:focus{outline:none; border-color:var(--amber);}
+
+  .urgency-toggle{display:flex; gap:8px; margin-bottom:14px;}
+  .urgency-btn{
+    flex:1; padding:10px; border-radius:6px; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+    background:var(--navy-2); border:1px solid var(--line); color:var(--ink-dim);
+    transition:all 0.15s ease;
+  }
+  .urgency-btn[data-urgency="normal"].selected{
+    background:var(--teal-dim); border-color:rgba(0,201,167,0.4); color:var(--teal);
+  }
+  .urgency-btn[data-urgency="urgent"].selected{
+    background:var(--rose-dim); border-color:rgba(251,113,133,0.4); color:var(--rose);
+  }
+
   .modal-actions{display:flex; gap:8px; margin-top:6px;}
   .modal-actions button{
     flex:1; padding:12px; border-radius:6px; border:none; cursor:pointer;
@@ -290,14 +314,26 @@
     <h2 class="display">New delivery</h2>
     <p class="sub">Assign an item to a runner.</p>
 
+    <label class="field-label">Name</label>
+    <input id="task-name" placeholder="e.g. Budi Santoso">
+
     <label class="field-label">Item / order</label>
     <input id="task-item" placeholder="e.g. Wedding invitation cards — 500 pcs">
 
     <label class="field-label">Delivery address</label>
     <input id="task-address" placeholder="e.g. Jl. Sisingamangaraja No. 12">
 
+    <label class="field-label">Urgency</label>
+    <div class="urgency-toggle" id="urgency-toggle">
+      <button type="button" class="urgency-btn selected" data-urgency="normal">Normal</button>
+      <button type="button" class="urgency-btn" data-urgency="urgent">Urgent</button>
+    </div>
+
     <label class="field-label">Assign to</label>
     <select id="task-assignee"></select>
+
+    <label class="field-label">Notes</label>
+    <textarea id="task-notes" placeholder="e.g. Call before arriving, leave with security if not home"></textarea>
 
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
@@ -573,13 +609,18 @@ const statusLabel = {
 
 function taskRowHTML(t){
   const assignee = employees[t.assignedTo]?.name || "Unassigned";
+  const isUrgent = t.urgency === "urgent";
   return `
     <div class="task-row status-${t.status}">
       <div class="task-row-top">
         <div class="task-row-item">${escapeHTML(t.item || "Unnamed item")}</div>
-        <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
+          <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+        </div>
       </div>
-      <div class="task-row-meta">${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+      <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+      ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
       ${t.status !== "delivered" ? `<div class="task-row-actions">
         <button data-reassign="${t.id}">Reassign</button>
       </div>` : ""}
@@ -599,10 +640,21 @@ const backdrop = document.getElementById("modal-backdrop");
 document.getElementById("open-new-task").addEventListener("click", () => backdrop.classList.add("open"));
 document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
 
+let selectedUrgency = "normal";
+document.querySelectorAll(".urgency-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedUrgency = btn.dataset.urgency;
+    document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b === btn));
+  });
+});
+
 document.getElementById("create-task").addEventListener("click", async () => {
+  const name = document.getElementById("task-name").value.trim();
   const item = document.getElementById("task-item").value.trim();
   const address = document.getElementById("task-address").value.trim();
   const assignedTo = document.getElementById("task-assignee").value;
+  const urgency = selectedUrgency;
+  const notes = document.getElementById("task-notes").value.trim();
 
   if (!item || !assignedTo){
     alert("Add an item and pick a runner before creating the task.");
@@ -610,14 +662,18 @@ document.getElementById("create-task").addEventListener("click", async () => {
   }
 
   await addDoc(collection(db, "tasks"), {
-    item, address, assignedTo,
+    name, item, address, assignedTo, urgency, notes,
     status: TASK_STATUS.PENDING,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
 
+  document.getElementById("task-name").value = "";
   document.getElementById("task-item").value = "";
   document.getElementById("task-address").value = "";
+  document.getElementById("task-notes").value = "";
+  selectedUrgency = "normal";
+  document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b.dataset.urgency === "normal"));
   backdrop.classList.remove("open");
 });
 

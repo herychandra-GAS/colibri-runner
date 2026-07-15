@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colibri Dispatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --navy-0:#0A0E17;
+    --navy-1:#10151F;
+    --navy-2:#161C29;
+    --navy-3:#1E2635;
+    --line:#2A3344;
+    --line-soft:#212938;
+    --ink:#E8ECF4;
+    --ink-dim:#8B96AC;
+    --ink-faint:#5B6579;
+    --amber:#F5A623;
+    --amber-dim:#B87A18;
+    --cyan:#3ED6D0;
+    --green:#4ADE80;
+    --red:#F2545B;
+    --panel-w: 400px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
+  body{
+    background:var(--navy-0);
+    color:var(--ink);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:500;
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:'Barlow Condensed',sans-serif;font-weight:700;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-weight:500;
+    letter-spacing:0.14em; text-transform:uppercase; font-size:10.5px; color:var(--ink-faint);
+  }
+
+  #app{display:flex; height:100vh; overflow:hidden;}
+  #map{flex:1; height:100%; background:#111;}
+  #panel{
+    width:var(--panel-w); min-width:var(--panel-w);
+    height:100%; overflow-y:auto;
+    background:var(--navy-1);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    border-left:1px solid var(--line);
+    display:flex; flex-direction:column;
+  }
+
+  header.top{
+    padding:20px 22px 16px; border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+    position:sticky; top:0; background:var(--navy-1); z-index:2;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:32px;height:32px;border-radius:6px; background:var(--navy-3);
+    border:1px solid var(--amber-dim); color:var(--amber);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px;
+  }
+  .brand-name{font-size:14px; font-weight:600; color:var(--ink); letter-spacing:0.02em;}
+  .new-task-btn{
+    background:var(--amber); color:var(--navy-0); border:none; border-radius:6px;
+    padding:9px 14px; font-family:'Barlow Condensed',sans-serif; font-weight:600;
+    font-size:13.5px; cursor:pointer; text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .new-task-btn:active{transform:scale(0.97);}
+  .logout-btn{
+    background:transparent; color:var(--ink-faint); font-size:11.5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 10px;
+    text-transform:uppercase; border:1px solid var(--line); border-radius:6px; cursor:pointer;
+  }
+  .logout-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
+
+  .roster{
+    display:flex; gap:8px; padding:14px 22px; overflow-x:auto;
+    border-bottom:1px solid var(--line);
+  }
+  .roster-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:7px;
+    background:var(--navy-2); border:1px solid var(--line); border-radius:100px;
+    padding:6px 12px 6px 6px; font-size:12.5px; cursor:pointer;
+    transition:border-color 0.15s ease; color:var(--ink-dim);
+  }
+  .roster-chip.selected{border-color:var(--amber); color:var(--ink);}
+  .roster-avatar{
+    width:22px;height:22px;border-radius:50%; background:var(--navy-3);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;
+  }
+  .roster-dot{width:7px;height:7px;border-radius:50%; margin-left:2px;}
+  .roster-dot.live{background:var(--green); box-shadow:0 0 5px var(--green);}
+  .roster-dot.stale{background:var(--ink-faint);}
+
+  .list-section{padding:16px 22px 4px;}
+  .task-row{
+    background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; margin-bottom:8px; position:relative; overflow:hidden;
+  }
+  .task-row::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .task-row.status-pending::before{background:var(--amber);}
+  .task-row.status-in_progress::before{background:var(--cyan);}
+  .task-row.status-delivered::before{background:var(--green);}
+  .task-row.status-failed::before{background:var(--red);}
+  .task-row-top{display:flex; justify-content:space-between; gap:8px;}
+  .task-row-item{font-size:14.5px; font-weight:600; color:var(--ink);}
+  .task-row-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:9.5px;
+    letter-spacing:0.05em; text-transform:uppercase; padding:3px 7px; border-radius:4px;
+    white-space:nowrap; height:fit-content; border:1px solid;
+  }
+  .badge-pending{background:rgba(245,166,35,0.1); color:var(--amber); border-color:rgba(245,166,35,0.35);}
+  .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
+  .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
+  .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .task-row-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .task-row-actions{margin-top:8px; display:flex; gap:6px;}
+  .task-row-actions button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
+    border-radius:5px; border:1px solid var(--line); background:var(--navy-1);
+    color:var(--ink-dim); cursor:pointer;
+  }
+  .task-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
+  .empty-list{text-align:center; padding:32px 20px; color:var(--ink-faint); font-size:13px; font-family:'IBM Plex Mono',monospace;}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(10,14,23,0.7);
+    display:none; align-items:center; justify-content:center; z-index:50;
+    padding:24px; overflow-y:auto;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--navy-1); border:1px solid var(--line); border-radius:10px;
+    width:100%; max-width:420px;
+    padding:24px; max-height:88vh; overflow-y:auto;
+  }
+  .modal h2{font-family:'Barlow Condensed',sans-serif; font-size:24px; margin:0 0 4px; color:var(--ink);}
+  .modal p.sub{font-size:13px; color:var(--ink-faint); margin:0 0 20px; font-family:'IBM Plex Mono',monospace;}
+  .field-label{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.04em;
+    text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; display:block;
+  }
+  .modal input, .modal select{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Mono',monospace; font-size:13.5px; margin-bottom:14px;
+    background:var(--navy-2); color:var(--ink);
+  }
+  .modal input:focus, .modal select:focus{outline:none; border-color:var(--amber);}
+  .modal-actions{display:flex; gap:8px; margin-top:6px;}
+  .modal-actions button{
+    flex:1; padding:12px; border-radius:6px; border:none; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-cancel{background:var(--navy-3); color:var(--ink-dim);}
+  .btn-create{background:var(--amber); color:var(--navy-0);}
+
+  .courier-label{
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px;
+    background:var(--navy-1); color:var(--ink); padding:2px 6px; border-radius:4px;
+    border:1px solid var(--line); white-space:nowrap;
+  }
+
+  .leaflet-control-zoom a{
+    background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
+  }
+<style>
+  .auth-screen{
+    position:fixed; inset:0; z-index:100;
+    background:var(--navy-0);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .auth-screen.hidden{display:none;}
+  .auth-card{width:100%; max-width:360px; text-align:left;}
+  .auth-card h1{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:32px; margin:0 0 6px; color:var(--ink);}
+  .auth-card p{color:var(--ink-dim); font-size:14px; margin:0 0 26px; font-family:'IBM Plex Mono',monospace; line-height:1.5;}
+  .btn-google{
+    width:100%; background:var(--ink); color:var(--navy-0); padding:14px; border-radius:6px;
+    font-size:15px; display:flex; align-items:center; justify-content:center; gap:10px;
+    font-family:'Rajdhani',sans-serif; font-weight:600; border:none; cursor:pointer;
+  }
+  .btn-google:active{transform:scale(0.98);}
+  .btn-cancel-full{
+    width:100%; background:var(--navy-2); border:1px solid var(--line); color:var(--ink-dim);
+    padding:14px; border-radius:6px; font-size:14px; margin-top:8px;
+    text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600;
+  }
+  .auth-error{color:var(--red); font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-top:12px; min-height:18px;}
+</style>
+</head>
+<body>
+
+<div class="auth-screen" id="login-screen">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:24px;">
+      <div class="brand-mark">C</div>
+      <div class="brand-name">COLIBRI DISPATCH</div>
+    </div>
+    <h1>Sign in.</h1>
+    <p>Dispatcher access — sign in with your Google account.</p>
+    <button class="btn-google" id="google-login-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      <span>Sign in with Google</span>
+    </button>
+    <div class="auth-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="auth-screen hidden" id="denied-screen">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:24px;">
+      <div class="brand-mark" style="border-color:var(--red); color:var(--red);">!</div>
+      <div class="brand-name">COLIBRI DISPATCH</div>
+    </div>
+    <h1 style="color:var(--red);">Access denied.</h1>
+    <p id="denied-detail">This account isn't authorized for dispatcher access.</p>
+    <button class="btn-cancel-full" id="denied-back-btn">Try a different account</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div id="map"></div>
+
+  <div id="panel">
+    <header class="top">
+      <div class="brand">
+        <div class="brand-mark">C</div>
+        <div class="brand-name">COLIBRI DISPATCH</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
+        <button class="new-task-btn" id="open-new-task">+ New task</button>
+      </div>
+    </header>
+
+    <div class="roster" id="roster"></div>
+
+    <div class="list-section">
+      <div class="eyebrow" style="margin:6px 0 10px;">Active manifest</div>
+      <div id="active-list"></div>
+    </div>
+    <div class="list-section">
+      <div class="eyebrow" style="margin:14px 0 10px;">Completed today</div>
+      <div id="done-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 class="display">New delivery</h2>
+    <p class="sub">Assign an item to a runner.</p>
+
+    <label class="field-label">Item / order</label>
+    <input id="task-item" placeholder="e.g. Wedding invitation cards — 500 pcs">
+
+    <label class="field-label">Delivery address</label>
+    <input id="task-address" placeholder="e.g. Jl. Sisingamangaraja No. 12">
+
+    <label class="field-label">Assign to</label>
+    <select id="task-assignee"></select>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancel-task">Cancel</button>
+      <button class="btn-create" id="create-task">Create task</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, doc, getDoc, addDoc, updateDoc, onSnapshot,
+  serverTimestamp, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBHB_wRo6ebQHQ_bP38zK148rdZQ_LMY-Q",
+  authDomain: "colibri-runner-be3ca.firebaseapp.com",
+  projectId: "colibri-runner-be3ca",
+  storageBucket: "colibri-runner-be3ca.firebasestorage.app",
+  messagingSenderId: "178686518201",
+  appId: "1:178686518201:web:f452fa0d0d4673bbee0c68"
+};
+const TASK_STATUS = {
+  PENDING: "pending", IN_PROGRESS: "in_progress",
+  DELIVERED: "delivered", FAILED: "failed"
+};
+const STALE_LOCATION_MS = 90000;
+
+// Only these Google accounts may reach the dispatcher app at all.
+// Being on this list does not by itself grant dispatcher role — that
+// still comes from their /employees/{uid}.role field being "dispatcher".
+const ALLOWED_EMAILS = [
+  "hery.chandra@gmail.com",
+  "colibri.printing@gmail.com",
+  "angel7lee@gmail.com",
+  "mudacetak@gmail.com"
+];
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors",
+  maxZoom: 19
+}).addTo(map);
+
+// Leaflet measures its container's size at init time. If the #app flex layout
+// or web fonts haven't finished painting yet, that measurement can come back
+// as 0 and the map renders blank until something forces a reflow (like
+// opening DevTools). Force a few recalculations to cover that race.
+requestAnimationFrame(() => map.invalidateSize());
+window.addEventListener("load", () => map.invalidateSize());
+setTimeout(() => map.invalidateSize(), 300);
+setTimeout(() => map.invalidateSize(), 1000);
+
+const courierMarkers = {};
+const courierColors = ["#F5A623", "#3ED6D0", "#4ADE80", "#F2545B", "#A78BFA"];
+let colorIdx = 0;
+const employeeColor = {};
+
+function colorFor(uid){
+  if (!employeeColor[uid]) employeeColor[uid] = courierColors[colorIdx++ % courierColors.length];
+  return employeeColor[uid];
+}
+
+function makeIcon(color, initial){
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+             background:${color};border:2px solid #0A0E17;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+             display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);color:#0A0E17;font-family:'Barlow Condensed',sans-serif;
+               font-weight:700;font-size:13px;">${initial}</span>
+           </div>`,
+    iconSize:[30,30], iconAnchor:[15,30]
+  });
+}
+
+function showAuthScreen(id){
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("denied-screen").classList.add("hidden");
+  document.getElementById("app").style.display = "none";
+  if (id === "app"){
+    document.getElementById("app").style.display = "flex";
+  } else {
+    document.getElementById(id).classList.remove("hidden");
+  }
+}
+
+document.getElementById("google-login-btn").addEventListener("click", async () => {
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user"){
+      errEl.textContent = "Sign-in failed — please try again.";
+      console.error(e);
+    }
+  }
+});
+
+document.getElementById("denied-back-btn").addEventListener("click", async () => {
+  await signOut(auth);
+  showAuthScreen("login-screen");
+});
+
+document.getElementById("dispatcher-logout-btn").addEventListener("click", async () => {
+  await signOut(auth);
+  showAuthScreen("login-screen");
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user){
+    showAuthScreen("login-screen");
+    return;
+  }
+
+  const email = (user.email || "").toLowerCase();
+  if (!ALLOWED_EMAILS.includes(email)){
+    document.getElementById("denied-detail").textContent =
+      "This Google account isn't on the dispatcher access list.";
+    await signOut(auth);
+    showAuthScreen("denied-screen");
+    return;
+  }
+
+  const empDoc = await getDoc(doc(db, "employees", user.uid));
+  if (!empDoc.exists() || empDoc.data().role !== "dispatcher"){
+    document.getElementById("denied-detail").innerHTML = !empDoc.exists()
+      ? `Your account is allowed, but not registered yet.<br><br>Register this UID as a dispatcher in Firestore:<br><span class="mono" style="color:var(--ink); word-break:break-all;">${user.uid}</span>`
+      : "This account is registered, but not as a dispatcher.";
+    await signOut(auth);
+    showAuthScreen("denied-screen");
+    return;
+  }
+
+  showAuthScreen("app");
+  requestAnimationFrame(() => map.invalidateSize());
+  setTimeout(() => map.invalidateSize(), 150);
+  initDispatcher();
+});
+
+let employees = {};
+let tasksById = {};
+
+let dispatcherInitialized = false;
+function initDispatcher(){
+  if (dispatcherInitialized) return;
+  dispatcherInitialized = true;
+  subscribeEmployees();
+  subscribeLocations();
+  subscribeTasks();
+}
+
+function subscribeEmployees(){
+  onSnapshot(collection(db, "employees"), (snap) => {
+    employees = {};
+    snap.forEach(d => employees[d.id] = { id: d.id, ...d.data() });
+    renderRoster();
+    populateAssigneeSelect();
+  });
+}
+
+let selectedEmployeeId = null;
+
+function renderRoster(){
+  const el = document.getElementById("roster");
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  el.innerHTML = `<div class="roster-chip ${selectedEmployeeId === null ? 'selected' : ''}" data-uid="">
+      <div class="roster-avatar">All</div>
+    </div>` + ids.map(id => {
+    const e = employees[id];
+    const initial = (e.name || "?").charAt(0).toUpperCase();
+    const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+    return `<div class="roster-chip ${selectedEmployeeId === id ? 'selected' : ''}" data-uid="${id}">
+        <div class="roster-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
+        <span>${escapeHTML(e.name || "Runner")}</span>
+        <div class="roster-dot ${isLive ? 'live' : 'stale'}"></div>
+      </div>`;
+  }).join("");
+
+  el.querySelectorAll(".roster-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      selectedEmployeeId = chip.dataset.uid || null;
+      renderRoster();
+      renderTaskLists();
+      if (selectedEmployeeId && courierMarkers[selectedEmployeeId]){
+        map.setView(courierMarkers[selectedEmployeeId].getLatLng(), 15);
+      }
+    });
+  });
+}
+
+function populateAssigneeSelect(){
+  const sel = document.getElementById("task-assignee");
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  sel.innerHTML = ids.map(id => `<option value="${id}">${escapeHTML(employees[id].name || "Runner")}</option>`).join("");
+}
+
+const locationUpdatedAt = {};
+
+function lastLocationAge(uid){
+  const t = locationUpdatedAt[uid];
+  return t ? (Date.now() - t) : Infinity;
+}
+
+function subscribeLocations(){
+  onSnapshot(collection(db, "locations"), (snap) => {
+    snap.forEach(d => {
+      const data = d.data();
+      const uid = d.id;
+      if (!data.lat || !data.lng) return;
+
+      locationUpdatedAt[uid] = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
+
+      const name = employees[uid]?.name || "Runner";
+      const initial = name.charAt(0).toUpperCase();
+      const latlng = [data.lat, data.lng];
+
+      if (courierMarkers[uid]){
+        courierMarkers[uid].setLatLng(latlng);
+      } else {
+        courierMarkers[uid] = L.marker(latlng, { icon: makeIcon(colorFor(uid), initial) })
+          .addTo(map)
+          .bindTooltip(name, { direction: "top", offset: [0,-28], className: "courier-label" });
+      }
+    });
+    renderRoster();
+  });
+}
+
+function subscribeTasks(){
+  const q = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
+  onSnapshot(q, (snap) => {
+    tasksById = {};
+    snap.forEach(d => tasksById[d.id] = { id: d.id, ...d.data() });
+    renderTaskLists();
+  });
+}
+
+function renderTaskLists(){
+  let tasks = Object.values(tasksById);
+  if (selectedEmployeeId) tasks = tasks.filter(t => t.assignedTo === selectedEmployeeId);
+
+  const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
+
+  document.getElementById("active-list").innerHTML = active.length
+    ? active.map(taskRowHTML).join("")
+    : `<div class="empty-list">No active deliveries.</div>`;
+  document.getElementById("done-list").innerHTML = done.length
+    ? done.map(taskRowHTML).join("")
+    : `<div class="empty-list">Nothing completed yet.</div>`;
+
+  document.querySelectorAll("[data-reassign]").forEach(btn => {
+    btn.addEventListener("click", () => openReassignPrompt(btn.dataset.reassign));
+  });
+}
+
+const statusLabel = {
+  pending: "Pending", in_progress: "In progress", delivered: "Delivered", failed: "Failed"
+};
+
+function taskRowHTML(t){
+  const assignee = employees[t.assignedTo]?.name || "Unassigned";
+  return `
+    <div class="task-row status-${t.status}">
+      <div class="task-row-top">
+        <div class="task-row-item">${escapeHTML(t.item || "Unnamed item")}</div>
+        <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+      </div>
+      <div class="task-row-meta">${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+      ${t.status !== "delivered" ? `<div class="task-row-actions">
+        <button data-reassign="${t.id}">Reassign</button>
+      </div>` : ""}
+    </div>`;
+}
+
+async function openReassignPrompt(taskId){
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  const names = ids.map(id => employees[id].name || id).join(", ");
+  const name = prompt(`Reassign to (${names}):`);
+  const targetId = ids.find(id => (employees[id].name || "").toLowerCase() === (name || "").toLowerCase());
+  if (!targetId) return;
+  await updateDoc(doc(db, "tasks", taskId), { assignedTo: targetId, status: TASK_STATUS.PENDING, updatedAt: serverTimestamp() });
+}
+
+const backdrop = document.getElementById("modal-backdrop");
+document.getElementById("open-new-task").addEventListener("click", () => backdrop.classList.add("open"));
+document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
+
+document.getElementById("create-task").addEventListener("click", async () => {
+  const item = document.getElementById("task-item").value.trim();
+  const address = document.getElementById("task-address").value.trim();
+  const assignedTo = document.getElementById("task-assignee").value;
+
+  if (!item || !assignedTo){
+    alert("Add an item and pick a runner before creating the task.");
+    return;
+  }
+
+  await addDoc(collection(db, "tasks"), {
+    item, address, assignedTo,
+    status: TASK_STATUS.PENDING,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  document.getElementById("task-item").value = "";
+  document.getElementById("task-address").value = "";
+  backdrop.classList.remove("open");
+});
+
+function escapeHTML(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+setInterval(renderRoster, 15000);
+</script>
+</body>
+</html>

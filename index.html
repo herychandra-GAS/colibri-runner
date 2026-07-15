@@ -116,6 +116,30 @@
   .roster-dot.stale{background:var(--ink-faint);}
 
   .list-section{padding:16px 22px 4px;}
+  .housekeeping-section{padding-bottom:22px;}
+  .housekeeping-row{
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-dim);
+    flex-wrap:wrap;
+  }
+  .housekeeping-row input{
+    width:56px; padding:7px 8px; border:1px solid var(--line); border-radius:5px;
+    background:var(--navy-2); color:var(--ink); font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px; text-align:center;
+  }
+  .housekeeping-row input:focus{outline:none; border-color:var(--amber);}
+  .btn-housekeeping{
+    width:100%; padding:11px; border-radius:6px; border:1px solid rgba(251,113,133,0.4);
+    background:var(--rose-dim); color:var(--rose); cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-housekeeping:hover{background:rgba(251,113,133,0.22);}
+  .btn-housekeeping:disabled{opacity:0.5; cursor:default;}
+  .housekeeping-status{
+    margin-top:8px; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    color:var(--ink-faint); min-height:16px;
+  }
   .task-row{
     background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
     padding:12px 14px; margin-bottom:8px; position:relative; overflow:hidden;
@@ -152,6 +176,8 @@
     color:var(--ink-dim); cursor:pointer;
   }
   .task-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
+  .btn-delete-row{margin-left:auto;}
+  .btn-delete-row:hover{border-color:var(--rose) !important; color:var(--rose) !important;}
   .empty-list{text-align:center; padding:32px 20px; color:var(--ink-faint); font-size:13px; font-family:'IBM Plex Mono',monospace;}
 
   .modal-backdrop{
@@ -305,6 +331,17 @@
       <div class="eyebrow" style="margin:14px 0 10px;">Completed today</div>
       <div id="done-list"></div>
     </div>
+
+    <div class="list-section housekeeping-section">
+      <div class="eyebrow" style="margin:14px 0 10px;">Housekeeping</div>
+      <div class="housekeeping-row">
+        <span>Delete tasks older than</span>
+        <input type="number" id="housekeeping-weeks" min="1" value="4">
+        <span>week(s)</span>
+      </div>
+      <button class="btn-housekeeping" id="housekeeping-run">Delete old tasks</button>
+      <div class="housekeeping-status" id="housekeeping-status"></div>
+    </div>
   </div>
   </div>
 </div>
@@ -349,7 +386,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, addDoc, updateDoc, onSnapshot,
+  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
   serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -601,7 +638,70 @@ function renderTaskLists(){
   document.querySelectorAll("[data-reassign]").forEach(btn => {
     btn.addEventListener("click", () => openReassignPrompt(btn.dataset.reassign));
   });
+  document.querySelectorAll("[data-delete]").forEach(btn => {
+    btn.addEventListener("click", () => deleteTask(btn.dataset.delete));
+  });
 }
+
+async function deleteTask(taskId){
+  const t = tasksById[taskId];
+  const label = t?.item || "this task";
+  if (!confirm(`Delete "${label}"? This can't be undone.`)) return;
+  try {
+    await deleteDoc(doc(db, "tasks", taskId));
+  } catch (e) {
+    console.error("Failed to delete task:", e);
+    alert("Couldn't delete that task — check your connection and try again.");
+  }
+}
+
+document.getElementById("housekeeping-run").addEventListener("click", async () => {
+  const weeksInput = document.getElementById("housekeeping-weeks");
+  const statusEl = document.getElementById("housekeeping-status");
+  const runBtn = document.getElementById("housekeeping-run");
+
+  const weeks = parseFloat(weeksInput.value);
+  if (!weeks || weeks <= 0){
+    statusEl.textContent = "Enter a valid number of weeks.";
+    statusEl.style.color = "var(--rose)";
+    return;
+  }
+
+  const cutoffMs = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
+  const stale = Object.values(tasksById).filter(t => {
+    const createdMs = t.createdAt?.toMillis ? t.createdAt.toMillis() : null;
+    return createdMs !== null && createdMs < cutoffMs;
+  });
+
+  if (stale.length === 0){
+    statusEl.textContent = "No tasks older than that.";
+    statusEl.style.color = "var(--ink-faint)";
+    return;
+  }
+
+  if (!confirm(`Delete ${stale.length} task(s) older than ${weeks} week(s)? This can't be undone.`)) return;
+
+  runBtn.disabled = true;
+  statusEl.textContent = `Deleting ${stale.length} task(s)...`;
+  statusEl.style.color = "var(--ink-faint)";
+
+  let deleted = 0, failed = 0;
+  for (const t of stale){
+    try {
+      await deleteDoc(doc(db, "tasks", t.id));
+      deleted++;
+    } catch (e) {
+      console.error("Failed to delete task during housekeeping:", t.id, e);
+      failed++;
+    }
+  }
+
+  runBtn.disabled = false;
+  statusEl.textContent = failed > 0
+    ? `Deleted ${deleted} task(s), ${failed} failed — try again.`
+    : `Deleted ${deleted} task(s).`;
+  statusEl.style.color = failed > 0 ? "var(--rose)" : "var(--green)";
+});
 
 const statusLabel = {
   pending: "Pending", in_progress: "In progress", delivered: "Delivered", failed: "Failed"
@@ -621,9 +721,10 @@ function taskRowHTML(t){
       </div>
       <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
       ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
-      ${t.status !== "delivered" ? `<div class="task-row-actions">
-        <button data-reassign="${t.id}">Reassign</button>
-      </div>` : ""}
+      <div class="task-row-actions">
+        ${t.status !== "delivered" ? `<button data-reassign="${t.id}">Reassign</button>` : ""}
+        <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
+      </div>
     </div>`;
 }
 

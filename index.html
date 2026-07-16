@@ -133,6 +133,39 @@
   .view-toggle-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
 
   .list-section{padding:16px 22px 4px;}
+
+  .completed-toggle{
+    display:flex; align-items:center; gap:8px; width:100%;
+    background:none; border:none; padding:0; margin:6px 0 10px; cursor:pointer;
+  }
+  .completed-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+    background:var(--navy-2); border:1px solid var(--line); border-radius:100px;
+    padding:1px 8px;
+  }
+  .completed-chevron{
+    margin-left:auto; color:var(--ink-faint); font-size:12px;
+    transition:transform 0.15s ease;
+  }
+  .done-list-wrap{display:none;}
+  .done-list-wrap.open{display:block;}
+  .completed-toggle.open .completed-chevron{transform:rotate(180deg);}
+
+  .date-group-header{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em;
+    text-transform:uppercase; color:var(--ink-faint); margin:14px 0 8px;
+    padding-bottom:6px; border-bottom:1px solid var(--line);
+  }
+  .date-group-header:first-child{margin-top:0;}
+
+  .btn-show-more{
+    width:100%; margin-top:10px; padding:9px; border-radius:6px;
+    border:1px solid var(--line); background:var(--navy-2); color:var(--ink-dim);
+    cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-show-more:hover{border-color:var(--amber); color:var(--ink);}
+
   .housekeeping-section{padding-bottom:22px;}
   .housekeeping-row{
     display:flex; align-items:center; gap:8px; margin-bottom:10px;
@@ -405,8 +438,15 @@
       <div id="active-list"></div>
     </div>
     <div class="list-section">
-      <div class="eyebrow" style="margin:14px 0 10px;">Completed today</div>
-      <div id="done-list"></div>
+      <button type="button" class="completed-toggle" id="completed-toggle">
+        <span class="eyebrow" style="margin:0;">Completed</span>
+        <span class="completed-count" id="completed-count">0</span>
+        <span class="completed-chevron" id="completed-chevron">▾</span>
+      </button>
+      <div id="done-list-wrap" class="done-list-wrap">
+        <div id="done-list"></div>
+        <button type="button" class="btn-show-more" id="show-more-done" style="display:none;">Show more</button>
+      </div>
     </div>
 
     <div class="list-section housekeeping-section">
@@ -656,6 +696,7 @@ function renderRoster(){
   el.querySelectorAll(".roster-chip").forEach(chip => {
     chip.addEventListener("click", () => {
       selectedEmployeeId = chip.dataset.uid || null;
+      donePageCount = DONE_PAGE_SIZE;
       renderRoster();
       renderTaskLists();
       if (selectedEmployeeId && courierMarkers[selectedEmployeeId]){
@@ -713,6 +754,31 @@ function subscribeTasks(){
 }
 
 let searchQuery = "";
+const DONE_PAGE_SIZE = 15;
+let donePageCount = DONE_PAGE_SIZE;
+
+function dateGroupLabel(ts){
+  if (!ts?.toDate) return "Older";
+  const d = ts.toDate();
+  const now = new Date();
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+  if (dayDiff <= 0) return "Today";
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff <= 7) return "This week";
+  return "Older";
+}
+
+function groupDoneTasks(done){
+  const order = ["Today", "Yesterday", "This week", "Older"];
+  const groups = {};
+  done.forEach(t => {
+    const label = dateGroupLabel(t.completedAt || t.createdAt);
+    (groups[label] = groups[label] || []).push(t);
+  });
+  return order.filter(label => groups[label]?.length).map(label => ({ label, tasks: groups[label] }));
+}
 
 function renderTaskLists(){
   let tasks = Object.values(tasksById);
@@ -732,13 +798,46 @@ function renderTaskLists(){
 
   const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
   const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
+  done.sort((a, b) => {
+    const aMs = (a.completedAt || a.createdAt)?.toMillis ? (a.completedAt || a.createdAt).toMillis() : 0;
+    const bMs = (b.completedAt || b.createdAt)?.toMillis ? (b.completedAt || b.createdAt).toMillis() : 0;
+    return bMs - aMs;
+  });
 
   document.getElementById("active-list").innerHTML = active.length
     ? active.map(taskRowHTML).join("")
     : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
-  document.getElementById("done-list").innerHTML = done.length
-    ? done.map(taskRowHTML).join("")
-    : `<div class="empty-list">${searchQuery ? "No matching completed tasks." : "Nothing completed yet."}</div>`;
+
+  document.getElementById("completed-count").textContent = done.length;
+
+  const isSearching = !!searchQuery;
+  const visibleDone = isSearching ? done : done.slice(0, donePageCount);
+  const hasMore = !isSearching && done.length > donePageCount;
+
+  if (done.length === 0){
+    document.getElementById("done-list").innerHTML =
+      `<div class="empty-list">${searchQuery ? "No matching completed tasks." : "Nothing completed yet."}</div>`;
+  } else if (isSearching){
+    // Flat list while searching — no date grouping, so matches aren't buried under collapsed groups.
+    document.getElementById("done-list").innerHTML = visibleDone.map(taskRowHTML).join("");
+  } else {
+    document.getElementById("done-list").innerHTML = groupDoneTasks(visibleDone).map(g => `
+      <div class="date-group-header">${g.label} · ${g.tasks.length}</div>
+      ${g.tasks.map(taskRowHTML).join("")}
+    `).join("");
+  }
+
+  document.getElementById("show-more-done").style.display = hasMore ? "block" : "none";
+
+  // Auto-expand the completed section while actively searching, so matches
+  // aren't hidden behind the collapsed toggle; otherwise leave it as the
+  // user last set it.
+  const doneWrap = document.getElementById("done-list-wrap");
+  const toggleBtn = document.getElementById("completed-toggle");
+  if (isSearching && done.length){
+    doneWrap.classList.add("open");
+    toggleBtn.classList.add("open");
+  }
 
   document.querySelectorAll("[data-reassign]").forEach(btn => {
     btn.addEventListener("click", () => openReassignPrompt(btn.dataset.reassign));
@@ -953,6 +1052,18 @@ document.getElementById("cancel-task").addEventListener("click", () => backdrop.
 
 document.getElementById("task-search").addEventListener("input", (e) => {
   searchQuery = e.target.value.trim();
+  donePageCount = DONE_PAGE_SIZE;
+  renderTaskLists();
+});
+
+document.getElementById("completed-toggle").addEventListener("click", (e) => {
+  const wrap = document.getElementById("done-list-wrap");
+  const isOpen = wrap.classList.toggle("open");
+  e.currentTarget.classList.toggle("open", isOpen);
+});
+
+document.getElementById("show-more-done").addEventListener("click", () => {
+  donePageCount += DONE_PAGE_SIZE;
   renderTaskLists();
 });
 

@@ -60,7 +60,7 @@
     display:flex;align-items:center;justify-content:center;
     font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px;
   }
-  .brand-name{font-size:20px; font-weight:600; color:var(--ink); letter-spacing:0.1em; text-transform:uppercase;}
+  .brand-name{font-size:13.5px; font-weight:600; color:var(--ink); letter-spacing:0.1em; text-transform:uppercase;}
   .logo-dot{width:7px;height:7px;background:var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amber);animation:pdot 2s ease-in-out infinite; flex-shrink:0;}
   @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 8px var(--amber);}50%{opacity:.5;box-shadow:0 0 16px var(--amber);}}
   .hd{width:1px;height:26px;background:var(--border2); flex-shrink:0;}
@@ -115,6 +115,23 @@
   .roster-dot.live{background:var(--green); box-shadow:0 0 5px var(--green);}
   .roster-dot.stale{background:var(--ink-faint);}
 
+  .search-wrap{padding:14px 22px 0;}
+  .search-input{
+    width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink);
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+  }
+  .search-input::placeholder{color:var(--ink-faint);}
+  .search-input:focus{outline:none; border-color:var(--amber);}
+
+  .view-toggle-btn{
+    display:none;
+    background:transparent; color:var(--ink-dim); font-size:11px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 10px;
+    text-transform:uppercase; border:1px solid var(--border2); border-radius:4px; cursor:pointer;
+  }
+  .view-toggle-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
+
   .list-section{padding:16px 22px 4px;}
   .housekeeping-section{padding-bottom:22px;}
   .housekeeping-row{
@@ -152,7 +169,7 @@
   .task-row.status-delivered::before{background:var(--green);}
   .task-row.status-failed::before{background:var(--red);}
   .task-row-top{display:flex; justify-content:space-between; gap:8px;}
-  .task-row-item{font-family: 'IBM Plex Mono', monospace;font-size:18px; font-weight:400; color:var(--ink);}
+  .task-row-item{font-size:14.5px; font-weight:600; color:var(--ink);}
   .task-row-badge{
     font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:9.5px;
     letter-spacing:0.05em; text-transform:uppercase; padding:3px 7px; border-radius:4px;
@@ -168,6 +185,10 @@
     font-size:12px; color:var(--ink-dim); margin-top:6px; padding:6px 9px;
     background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
     font-style:italic; line-height:1.4;
+  }
+  .task-row-dates{
+    display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
   }
   .task-row-actions{margin-top:8px; display:flex; gap:6px;}
   .task-row-actions button{
@@ -267,6 +288,33 @@
     background:rgba(9,17,31,0.75) !important; color:var(--ink-faint) !important;
   }
   .leaflet-control-attribution a{ color:var(--ink-dim) !important; }
+
+  @media (max-width: 768px){
+    header.top{padding:0 14px; height:52px;}
+    .brand-name{font-size:11.5px;}
+    .brand-mark{width:26px;height:26px;font-size:13px;}
+    .hd{display:none;}
+    .new-task-btn{padding:7px 11px; font-size:11.5px;}
+    .logout-btn{padding:5px 8px; font-size:9.5px;}
+
+    .view-toggle-btn{display:inline-block;}
+
+    #body-split{position:relative; overflow:hidden;}
+    #map-wrap{
+      position:absolute; inset:0; padding:10px; z-index:1;
+      transition:transform 0.25s ease, opacity 0.25s ease;
+    }
+    #panel{
+      position:absolute; inset:0; width:100%; min-width:0; z-index:2;
+      transform:translateX(100%); transition:transform 0.25s ease;
+    }
+    #app.show-list #map-wrap{transform:translateX(-6%); opacity:0; pointer-events:none;}
+    #app.show-list #panel{transform:translateX(0);}
+
+    .roster{padding:12px 14px;}
+    .search-wrap{padding:10px 14px 0;}
+    .list-section{padding:14px 14px 4px;}
+  }
 </style>
 <style>
   .auth-screen{
@@ -336,6 +384,7 @@
       <div class="brand-name">Colibri Dispatch</div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
+      <button class="view-toggle-btn" id="view-toggle-btn">Show list</button>
       <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
       <button class="new-task-btn" id="open-new-task">+ New task</button>
     </div>
@@ -346,6 +395,10 @@
 
     <div id="panel">
       <div class="roster" id="roster"></div>
+
+      <div class="search-wrap">
+        <input type="text" id="task-search" class="search-input" placeholder="Search item, name, address, runner...">
+      </div>
 
     <div class="list-section">
       <div class="eyebrow" style="margin:6px 0 10px;">Active manifest</div>
@@ -448,8 +501,7 @@ const ALLOWED_EMAILS = [
   "hery.chandra@gmail.com",
   "colibri.printing@gmail.com",
   "angel7lee@gmail.com",
-  "mudacetak@gmail.com",
-  "runner01.colibri@gmail.com"
+  "mudacetak@gmail.com"
 ];
 
 const app = initializeApp(firebaseConfig);
@@ -660,19 +712,33 @@ function subscribeTasks(){
   });
 }
 
+let searchQuery = "";
+
 function renderTaskLists(){
   let tasks = Object.values(tasksById);
   if (selectedEmployeeId) tasks = tasks.filter(t => t.assignedTo === selectedEmployeeId);
+
+  if (searchQuery){
+    const q = searchQuery.toLowerCase();
+    tasks = tasks.filter(t => {
+      const assigneeName = employees[t.assignedTo]?.name || "";
+      return (t.item || "").toLowerCase().includes(q)
+        || (t.name || "").toLowerCase().includes(q)
+        || (t.address || "").toLowerCase().includes(q)
+        || (t.notes || "").toLowerCase().includes(q)
+        || assigneeName.toLowerCase().includes(q);
+    });
+  }
 
   const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
   const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
 
   document.getElementById("active-list").innerHTML = active.length
     ? active.map(taskRowHTML).join("")
-    : `<div class="empty-list">No active deliveries.</div>`;
+    : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
   document.getElementById("done-list").innerHTML = done.length
     ? done.map(taskRowHTML).join("")
-    : `<div class="empty-list">Nothing completed yet.</div>`;
+    : `<div class="empty-list">${searchQuery ? "No matching completed tasks." : "Nothing completed yet."}</div>`;
 
   document.querySelectorAll("[data-reassign]").forEach(btn => {
     btn.addEventListener("click", () => openReassignPrompt(btn.dataset.reassign));
@@ -749,9 +815,20 @@ const statusLabel = {
   pending: "Pending", in_progress: "In progress", delivered: "Delivered", failed: "Failed"
 };
 
+function formatTaskDate(ts){
+  if (!ts?.toDate) return null;
+  const d = ts.toDate();
+  const datePart = d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
 function taskRowHTML(t){
   const assignee = employees[t.assignedTo]?.name || "Unassigned";
   const isUrgent = t.urgency === "urgent";
+  const createdStr = formatTaskDate(t.createdAt);
+  const completedStr = formatTaskDate(t.completedAt);
+  const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
   return `
     <div class="task-row status-${t.status}">
       <div class="task-row-top">
@@ -763,6 +840,10 @@ function taskRowHTML(t){
       </div>
       <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
       ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
+      <div class="task-row-dates">
+        ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
+        ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
+      </div>
       <div class="task-row-actions">
         <button data-edit="${t.id}">Edit</button>
         ${t.status !== "delivered" ? `<button data-reassign="${t.id}">Reassign</button>` : ""}
@@ -869,6 +950,19 @@ function openEditModal(taskId){
 
 document.getElementById("open-new-task").addEventListener("click", openCreateModal);
 document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
+
+document.getElementById("task-search").addEventListener("input", (e) => {
+  searchQuery = e.target.value.trim();
+  renderTaskLists();
+});
+
+const appEl = document.getElementById("app");
+const viewToggleBtn = document.getElementById("view-toggle-btn");
+viewToggleBtn.addEventListener("click", () => {
+  const showingList = appEl.classList.toggle("show-list");
+  viewToggleBtn.textContent = showingList ? "Show map" : "Show list";
+  if (!showingList) requestAnimationFrame(() => map.invalidateSize());
+});
 
 let selectedUrgency = "normal";
 document.querySelectorAll(".urgency-btn").forEach(btn => {

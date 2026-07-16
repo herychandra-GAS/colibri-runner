@@ -20,7 +20,7 @@
     --navy-0:var(--bg); --navy-1:var(--surface); --navy-2:var(--surface2); --navy-3:#122036;
     --line:var(--border); --line-soft:var(--border);
     --cyan:var(--teal); --red:var(--rose); --amber-dim2:#b87a18;
-    --panel-w: 400px;
+    --panel-w: 480px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
@@ -51,7 +51,26 @@
     border-bottom:1px solid var(--border2);
     background:linear-gradient(180deg,#0d1018 0%,var(--bg) 100%);
     display:flex; justify-content:space-between; align-items:center;
-    position:relative; z-index:3;
+    position:relative; z-index:3; gap:20px;
+  }
+  .header-stats{
+    display:flex; align-items:center; gap:20px; flex:1;
+    justify-content:center; min-width:0;
+  }
+  .header-stat{
+    display:flex; align-items:center; gap:7px;
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-dim);
+    white-space:nowrap;
+  }
+  .header-stat strong{
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; color:var(--ink);
+  }
+  .header-stat .stat-dot{width:6px;height:6px;border-radius:50%; flex-shrink:0;}
+  .header-stat.stat-urgent strong{color:var(--rose);}
+  .header-stat.stat-online strong{color:var(--green);}
+  .header-stat-sep{width:1px; height:16px; background:var(--border2); flex-shrink:0;}
+  @media (max-width: 980px){
+    .header-stats{display:none;}
   }
   .brand{display:flex; align-items:center; gap:12px;}
   .brand-mark{
@@ -92,6 +111,8 @@
     width:var(--panel-w); min-width:var(--panel-w);
     height:100%; overflow-y:auto;
     background:var(--surface);
+    border-left:1px solid var(--border2);
+    box-shadow:-12px 0 24px -12px rgba(0,0,0,0.35);
     display:flex; flex-direction:column;
   }
 
@@ -416,6 +437,7 @@
       <div class="brand-mark">C</div>
       <div class="brand-name">Colibri Dispatch</div>
     </div>
+    <div class="header-stats" id="header-stats"></div>
     <div style="display:flex; align-items:center; gap:10px;">
       <button class="view-toggle-btn" id="view-toggle-btn">Show list</button>
       <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
@@ -741,6 +763,7 @@ function subscribeLocations(){
       }
     });
     renderRoster();
+    renderHeaderStats();
   });
 }
 
@@ -780,7 +803,27 @@ function groupDoneTasks(done){
   return order.filter(label => groups[label]?.length).map(label => ({ label, tasks: groups[label] }));
 }
 
+function renderHeaderStats(){
+  const allTasks = Object.values(tasksById);
+  const activeCount = allTasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS).length;
+  const urgentCount = allTasks.filter(t =>
+    (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS) && t.urgency === "urgent"
+  ).length;
+  const runnerIds = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  const onlineCount = runnerIds.filter(id => lastLocationAge(id) < STALE_LOCATION_MS).length;
+
+  document.getElementById("header-stats").innerHTML = `
+    <div class="header-stat"><strong>${activeCount}</strong> active</div>
+    <div class="header-stat-sep"></div>
+    <div class="header-stat stat-urgent"><strong>${urgentCount}</strong> urgent</div>
+    <div class="header-stat-sep"></div>
+    <div class="header-stat stat-online"><span class="stat-dot" style="background:var(--green); box-shadow:0 0 4px var(--green);"></span><strong>${onlineCount}</strong>/${runnerIds.length} runners online</div>
+  `;
+}
+
 function renderTaskLists(){
+  renderHeaderStats();
+
   let tasks = Object.values(tasksById);
   if (selectedEmployeeId) tasks = tasks.filter(t => t.assignedTo === selectedEmployeeId);
 
@@ -1121,7 +1164,7 @@ function escapeHTML(str){
   return d.innerHTML;
 }
 
-setInterval(renderRoster, 15000);
+setInterval(() => { renderRoster(); renderHeaderStats(); }, 15000);
 </script>
 </body>
 </html>

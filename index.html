@@ -109,56 +109,55 @@
     border:1px solid var(--border2); border-radius:8px; overflow:hidden;
   }
 
-  #task-strip{
-    flex-shrink:0; height:168px;
+  #runner-strip{
+    flex-shrink:0; height:112px;
     display:flex; flex-direction:column;
     background:var(--surface); border:1px solid var(--border2); border-radius:8px;
     overflow:hidden;
   }
-  .task-strip-header{
+  .strip-header{
     display:flex; align-items:center; gap:10px; padding:10px 14px;
     border-bottom:1px solid var(--border2); flex-shrink:0;
   }
-  .task-strip-header .eyebrow{margin:0;}
-  .task-strip-count{
+  .strip-header .eyebrow{margin:0;}
+  .strip-count{
     font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-faint);
     background:var(--navy-2); border:1px solid var(--line); border-radius:100px; padding:1px 7px;
   }
-  #task-strip-scroll{
+  #runner-strip-scroll{
     flex:1; min-height:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden;
-    padding:10px 14px;
+    padding:10px 14px; align-items:stretch;
   }
-  .strip-card{
-    flex-shrink:0; width:210px; height:100%;
-    background:var(--navy-2); border:1px solid var(--line); border-left:3px solid var(--amber);
+  .runner-card{
+    flex-shrink:0; width:150px; height:100%;
+    background:var(--navy-2); border:1px solid var(--line);
     border-radius:6px; padding:9px 11px; cursor:pointer;
-    display:flex; flex-direction:column; gap:5px;
-    transition:border-color 0.15s ease;
+    display:flex; flex-direction:column; gap:4px; justify-content:center;
+    transition:border-color 0.15s ease, background 0.15s ease;
   }
-  .strip-card:hover{border-color:var(--amber);}
-  .strip-card.status-in_progress{border-left-color:var(--teal);}
-  .strip-card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:6px;}
-  .strip-card-item{
-    font-size:13px; font-weight:600; color:var(--ink); line-height:1.25;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  .runner-card:hover{border-color:var(--ink-faint);}
+  .runner-card.selected{border-color:var(--amber); background:var(--amber-dim);}
+  .runner-card-top{display:flex; align-items:center; gap:8px;}
+  .runner-card-avatar{
+    width:26px;height:26px;border-radius:50%; flex-shrink:0; position:relative;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
   }
-  .strip-card-badge{
-    flex-shrink:0; font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:0.04em;
-    text-transform:uppercase; padding:2px 6px; border-radius:100px; border:1px solid;
+  .runner-card-dot{
+    position:absolute; bottom:-1px; right:-1px; width:8px;height:8px;border-radius:50%;
+    border:2px solid var(--navy-2);
   }
-  .strip-card-meta{
-    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+  .runner-card-dot.live{background:var(--green); box-shadow:0 0 4px var(--green);}
+  .runner-card-dot.stale{background:var(--ink-faint);}
+  .runner-card-name{
+    font-size:13px; font-weight:600; color:var(--ink);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .strip-card-assignee{
-    margin-top:auto; display:flex; align-items:center; gap:6px;
-    font-size:11px; color:var(--ink-dim);
+  .runner-card-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
   }
-  .strip-card-avatar{
-    width:16px;height:16px;border-radius:50%; flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:9px;
-  }
+  .runner-card.all-runners{align-items:center;}
+  .runner-card.all-runners .runner-card-top{justify-content:center; width:100%;}
   .strip-empty{
     margin:auto; color:var(--ink-faint); font-size:12px; font-family:'IBM Plex Mono',monospace;
   }
@@ -171,26 +170,6 @@
     box-shadow:-12px 0 24px -12px rgba(0,0,0,0.35);
     display:flex; flex-direction:column;
   }
-
-  .roster{
-    display:flex; gap:8px; padding:14px 22px; overflow-x:auto;
-    border-bottom:1px solid var(--border2); flex-shrink:0;
-  }
-  .roster-chip{
-    flex-shrink:0; display:flex; align-items:center; gap:7px;
-    background:var(--surface2); border:1px solid var(--border2); border-radius:100px;
-    padding:6px 12px 6px 6px; font-size:12.5px; cursor:pointer;
-    transition:border-color 0.15s ease; color:var(--ink-dim);
-  }
-  .roster-chip.selected{border-color:var(--amber); color:var(--ink); background:var(--amber-dim);}
-  .roster-avatar{
-    width:22px;height:22px;border-radius:50%; background:var(--navy-3);
-    display:flex;align-items:center;justify-content:center;
-    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;
-  }
-  .roster-dot{width:7px;height:7px;border-radius:50%; margin-left:2px;}
-  .roster-dot.live{background:var(--green); box-shadow:0 0 5px var(--green);}
-  .roster-dot.stale{background:var(--ink-faint);}
 
   .search-wrap{padding:14px 22px 0;}
   .search-input{
@@ -425,8 +404,8 @@
     .search-wrap{padding:10px 14px 0;}
     .list-section{padding:14px 14px 4px;}
 
-    #task-strip{height:140px;}
-    .strip-card{width:170px;}
+    #runner-strip{height:96px;}
+    .runner-card{width:120px;}
   }
 </style>
 <style>
@@ -507,18 +486,16 @@
   <div id="body-split">
     <div id="map-wrap">
       <div id="map"></div>
-      <div id="task-strip">
-        <div class="task-strip-header">
-          <span class="eyebrow">Active tasks</span>
-          <span class="task-strip-count" id="task-strip-count">0</span>
+      <div id="runner-strip">
+        <div class="strip-header">
+          <span class="eyebrow">Runners</span>
+          <span class="strip-count" id="runner-strip-count">0</span>
         </div>
-        <div id="task-strip-scroll"></div>
+        <div id="runner-strip-scroll"></div>
       </div>
     </div>
 
     <div id="panel">
-      <div class="roster" id="roster"></div>
-
       <div class="search-wrap">
         <input type="text" id="task-search" class="search-input" placeholder="Search item, name, address, runner...">
       </div>
@@ -760,34 +737,56 @@ function subscribeEmployees(){
   onSnapshot(collection(db, "employees"), (snap) => {
     employees = {};
     snap.forEach(d => employees[d.id] = { id: d.id, ...d.data() });
-    renderRoster();
+    renderRunnerStrip();
     populateAssigneeSelect();
   });
 }
 
 let selectedEmployeeId = null;
 
-function renderRoster(){
-  const el = document.getElementById("roster");
+function renderRunnerStrip(){
+  const el = document.getElementById("runner-strip-scroll");
   const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
-  el.innerHTML = `<div class="roster-chip ${selectedEmployeeId === null ? 'selected' : ''}" data-uid="">
-      <div class="roster-avatar">All</div>
-    </div>` + ids.map(id => {
-    const e = employees[id];
-    const initial = (e.name || "?").charAt(0).toUpperCase();
-    const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
-    return `<div class="roster-chip ${selectedEmployeeId === id ? 'selected' : ''}" data-uid="${id}">
-        <div class="roster-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
-        <span>${escapeHTML(e.name || "Runner")}</span>
-        <div class="roster-dot ${isLive ? 'live' : 'stale'}"></div>
-      </div>`;
-  }).join("");
 
-  el.querySelectorAll(".roster-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      selectedEmployeeId = chip.dataset.uid || null;
+  const activeCountFor = (uid) => Object.values(tasksById).filter(t =>
+    t.assignedTo === uid && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
+  ).length;
+  const totalActive = Object.values(tasksById).filter(t =>
+    t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS
+  ).length;
+
+  document.getElementById("runner-strip-count").textContent = ids.length;
+
+  el.innerHTML = `
+    <div class="runner-card all-runners ${selectedEmployeeId === null ? 'selected' : ''}" data-uid="">
+      <div class="runner-card-top">
+        <div class="runner-card-avatar" style="background:var(--navy-3); color:var(--ink-dim);">All</div>
+      </div>
+      <div class="runner-card-count" style="text-align:center;">${totalActive} active</div>
+    </div>` +
+    ids.map(id => {
+      const e = employees[id];
+      const initial = (e.name || "?").charAt(0).toUpperCase();
+      const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+      const count = activeCountFor(id);
+      return `
+        <div class="runner-card ${selectedEmployeeId === id ? 'selected' : ''}" data-uid="${id}">
+          <div class="runner-card-top">
+            <div class="runner-card-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">
+              ${initial}
+              <div class="runner-card-dot ${isLive ? 'live' : 'stale'}"></div>
+            </div>
+            <div class="runner-card-name">${escapeHTML(e.name || "Runner")}</div>
+          </div>
+          <div class="runner-card-count">${count} active</div>
+        </div>`;
+    }).join("");
+
+  el.querySelectorAll("[data-uid]").forEach(card => {
+    card.addEventListener("click", () => {
+      selectedEmployeeId = card.dataset.uid || null;
       donePageCount = DONE_PAGE_SIZE;
-      renderRoster();
+      renderRunnerStrip();
       renderTaskLists();
       if (selectedEmployeeId && courierMarkers[selectedEmployeeId]){
         map.setView(courierMarkers[selectedEmployeeId].getLatLng(), 15);
@@ -830,7 +829,7 @@ function subscribeLocations(){
           .bindTooltip(name, { direction: "top", offset: [0,-28], className: "courier-label" });
       }
     });
-    renderRoster();
+    renderRunnerStrip();
     renderHeaderStats();
   });
 }
@@ -891,6 +890,7 @@ function renderHeaderStats(){
 
 function renderTaskLists(){
   renderHeaderStats();
+  renderRunnerStrip();
 
   let tasks = Object.values(tasksById);
   if (selectedEmployeeId) tasks = tasks.filter(t => t.assignedTo === selectedEmployeeId);
@@ -918,8 +918,6 @@ function renderTaskLists(){
   document.getElementById("active-list").innerHTML = active.length
     ? active.map(taskRowHTML).join("")
     : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
-
-  renderTaskStrip(active);
 
   document.getElementById("completed-count").textContent = done.length;
 
@@ -1062,38 +1060,6 @@ function taskRowHTML(t){
         <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
       </div>
     </div>`;
-}
-
-function stripCardHTML(t){
-  const assignee = employees[t.assignedTo];
-  const assigneeName = assignee?.name || "Unassigned";
-  const initial = assigneeName.charAt(0).toUpperCase();
-  const isUrgent = t.urgency === "urgent";
-  return `
-    <div class="strip-card status-${t.status}" data-strip-edit="${t.id}">
-      <div class="strip-card-top">
-        <div class="strip-card-item">${escapeHTML(t.item || "Unnamed item")}</div>
-        ${isUrgent ? `<div class="strip-card-badge badge-urgent">Urgent</div>` : ""}
-      </div>
-      <div class="strip-card-meta">${escapeHTML(t.address || "No address")}</div>
-      <div class="strip-card-assignee">
-        <div class="strip-card-avatar" style="background:${colorFor(t.assignedTo)}22;color:${colorFor(t.assignedTo)}">${initial}</div>
-        <span>${escapeHTML(assigneeName)}</span>
-      </div>
-    </div>`;
-}
-
-function renderTaskStrip(active){
-  document.getElementById("task-strip-count").textContent = active.length;
-  const scrollEl = document.getElementById("task-strip-scroll");
-
-  scrollEl.innerHTML = active.length
-    ? active.map(stripCardHTML).join("")
-    : `<div class="strip-empty">No active deliveries.</div>`;
-
-  scrollEl.querySelectorAll("[data-strip-edit]").forEach(card => {
-    card.addEventListener("click", () => openEditModal(card.dataset.stripEdit));
-  });
 }
 
 const reassignBackdrop = document.getElementById("reassign-backdrop");
@@ -1266,7 +1232,7 @@ function escapeHTML(str){
   return d.innerHTML;
 }
 
-setInterval(() => { renderRoster(); renderHeaderStats(); }, 15000);
+setInterval(() => { renderRunnerStrip(); renderHeaderStats(); }, 15000);
 </script>
 </body>
 </html>

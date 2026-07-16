@@ -203,6 +203,10 @@
     background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
     font-style:italic; line-height:1.4;
   }
+  .task-dates{
+    display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-faint);
+  }
   .task-perf{
     height:1px; margin:14px 0;
     background-image:repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
@@ -350,8 +354,7 @@ const ALLOWED_EMAILS = [
   "hery.chandra@gmail.com",
   "colibri.printing@gmail.com",
   "angel7lee@gmail.com",
-  "mudacetak@gmail.com",
-  "runner01.colibri@gmail.com"
+  "mudacetak@gmail.com"
 ];
 
 const app = initializeApp(firebaseConfig);
@@ -473,10 +476,21 @@ const statusLabel = {
   [TASK_STATUS.FAILED]: "Failed"
 };
 
+function formatTaskDate(ts){
+  if (!ts?.toDate) return null;
+  const d = ts.toDate();
+  const datePart = d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
 function taskCardHTML(t){
   const addr = t.address || "No address given";
   const item = t.item || "Unnamed item";
   const isUrgent = t.urgency === "urgent";
+  const createdStr = formatTaskDate(t.createdAt);
+  const completedStr = formatTaskDate(t.completedAt);
+  const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
   let actions = "";
   if (t.status === TASK_STATUS.PENDING){
     actions = `<button class="act-start" data-task-id="${t.id}" data-action="start">Start delivery</button>`;
@@ -499,6 +513,10 @@ function taskCardHTML(t){
         ${t.name ? `<div class="task-recipient">${escapeHTML(t.name)}</div>` : ""}
         <div class="task-addr">${escapeHTML(addr)}</div>
         ${t.notes ? `<div class="task-notes">${escapeHTML(t.notes)}</div>` : ""}
+        <div class="task-dates">
+          ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
+          ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
+        </div>
         ${actions ? `<div class="task-perf"></div><div class="task-actions">${actions}</div>` : ""}
       </div>
     </div>`;

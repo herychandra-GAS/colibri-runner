@@ -100,11 +100,67 @@
   #body-split{display:flex; flex:1; min-height:0;}
 
   #map-wrap{
-    flex:1; min-width:0; padding:16px 0 16px 16px; display:flex;
+    flex:1; min-width:0; min-height:0;
+    padding:16px 0 16px 16px;
+    display:flex; flex-direction:column; gap:12px;
   }
   #map{
-    width:100%; height:100%; background:#111;
+    width:100%; flex:1; min-height:0; background:#111;
     border:1px solid var(--border2); border-radius:8px; overflow:hidden;
+  }
+
+  #task-strip{
+    flex-shrink:0; height:168px;
+    display:flex; flex-direction:column;
+    background:var(--surface); border:1px solid var(--border2); border-radius:8px;
+    overflow:hidden;
+  }
+  .task-strip-header{
+    display:flex; align-items:center; gap:10px; padding:10px 14px;
+    border-bottom:1px solid var(--border2); flex-shrink:0;
+  }
+  .task-strip-header .eyebrow{margin:0;}
+  .task-strip-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-faint);
+    background:var(--navy-2); border:1px solid var(--line); border-radius:100px; padding:1px 7px;
+  }
+  #task-strip-scroll{
+    flex:1; min-height:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden;
+    padding:10px 14px;
+  }
+  .strip-card{
+    flex-shrink:0; width:210px; height:100%;
+    background:var(--navy-2); border:1px solid var(--line); border-left:3px solid var(--amber);
+    border-radius:6px; padding:9px 11px; cursor:pointer;
+    display:flex; flex-direction:column; gap:5px;
+    transition:border-color 0.15s ease;
+  }
+  .strip-card:hover{border-color:var(--amber);}
+  .strip-card.status-in_progress{border-left-color:var(--teal);}
+  .strip-card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:6px;}
+  .strip-card-item{
+    font-size:13px; font-weight:600; color:var(--ink); line-height:1.25;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .strip-card-badge{
+    flex-shrink:0; font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:0.04em;
+    text-transform:uppercase; padding:2px 6px; border-radius:100px; border:1px solid;
+  }
+  .strip-card-meta{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .strip-card-assignee{
+    margin-top:auto; display:flex; align-items:center; gap:6px;
+    font-size:11px; color:var(--ink-dim);
+  }
+  .strip-card-avatar{
+    width:16px;height:16px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:9px;
+  }
+  .strip-empty{
+    margin:auto; color:var(--ink-faint); font-size:12px; font-family:'IBM Plex Mono',monospace;
   }
 
   #panel{
@@ -368,6 +424,9 @@
     .roster{padding:12px 14px;}
     .search-wrap{padding:10px 14px 0;}
     .list-section{padding:14px 14px 4px;}
+
+    #task-strip{height:140px;}
+    .strip-card{width:170px;}
   }
 </style>
 <style>
@@ -446,7 +505,16 @@
   </header>
 
   <div id="body-split">
-    <div id="map-wrap"><div id="map"></div></div>
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div id="task-strip">
+        <div class="task-strip-header">
+          <span class="eyebrow">Active tasks</span>
+          <span class="task-strip-count" id="task-strip-count">0</span>
+        </div>
+        <div id="task-strip-scroll"></div>
+      </div>
+    </div>
 
     <div id="panel">
       <div class="roster" id="roster"></div>
@@ -851,6 +919,8 @@ function renderTaskLists(){
     ? active.map(taskRowHTML).join("")
     : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
 
+  renderTaskStrip(active);
+
   document.getElementById("completed-count").textContent = done.length;
 
   const isSearching = !!searchQuery;
@@ -992,6 +1062,38 @@ function taskRowHTML(t){
         <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
       </div>
     </div>`;
+}
+
+function stripCardHTML(t){
+  const assignee = employees[t.assignedTo];
+  const assigneeName = assignee?.name || "Unassigned";
+  const initial = assigneeName.charAt(0).toUpperCase();
+  const isUrgent = t.urgency === "urgent";
+  return `
+    <div class="strip-card status-${t.status}" data-strip-edit="${t.id}">
+      <div class="strip-card-top">
+        <div class="strip-card-item">${escapeHTML(t.item || "Unnamed item")}</div>
+        ${isUrgent ? `<div class="strip-card-badge badge-urgent">Urgent</div>` : ""}
+      </div>
+      <div class="strip-card-meta">${escapeHTML(t.address || "No address")}</div>
+      <div class="strip-card-assignee">
+        <div class="strip-card-avatar" style="background:${colorFor(t.assignedTo)}22;color:${colorFor(t.assignedTo)}">${initial}</div>
+        <span>${escapeHTML(assigneeName)}</span>
+      </div>
+    </div>`;
+}
+
+function renderTaskStrip(active){
+  document.getElementById("task-strip-count").textContent = active.length;
+  const scrollEl = document.getElementById("task-strip-scroll");
+
+  scrollEl.innerHTML = active.length
+    ? active.map(stripCardHTML).join("")
+    : `<div class="strip-empty">No active deliveries.</div>`;
+
+  scrollEl.querySelectorAll("[data-strip-edit]").forEach(card => {
+    card.addEventListener("click", () => openEditModal(card.dataset.stripEdit));
+  });
 }
 
 const reassignBackdrop = document.getElementById("reassign-backdrop");

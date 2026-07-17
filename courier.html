@@ -438,7 +438,14 @@ function subscribeToTasks(uid){
   const q = query(collection(db, "tasks"), where("assignedTo", "==", uid));
   onSnapshot(q, (snapshot) => {
     const tasks = [];
-    snapshot.forEach(d => tasks.push({ id: d.id, ...d.data() }));
+    // Tasks marked "queued" by the dispatcher aren't released to the runner
+    // yet — this keeps the courier's list focused on what they should
+    // actually act on right now.
+    snapshot.forEach(d => {
+      const data = d.data();
+      if (data.queued === true) return;
+      tasks.push({ id: d.id, ...data });
+    });
     renderTasks(tasks);
   }, (err) => {
     console.error("Task subscription error:", err);

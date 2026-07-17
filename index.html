@@ -105,12 +105,11 @@
     display:flex; flex-direction:column; gap:12px;
   }
   #map{
-    width:99%; flex:1; min-height:0; background:#111;
+    width:100%; flex:1; min-height:0; background:#111;
     border:1px solid var(--border2); border-radius:8px; overflow:hidden;
   }
 
   #runner-strip{
-    width: 99%;
     flex-shrink:0; height:112px;
     display:flex; flex-direction:column;
     background:var(--surface); border:1px solid var(--border2); border-radius:8px;
@@ -191,6 +190,21 @@
 
   .list-section{padding:16px 22px 4px;}
 
+  .manifest-tabs{display:flex; gap:6px; margin-bottom:12px;}
+  .manifest-tab{
+    display:flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:100px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink-dim); cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+    text-transform:uppercase; letter-spacing:0.03em;
+    transition:border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .manifest-tab:hover{border-color:var(--ink-faint);}
+  .manifest-tab.selected{border-color:var(--amber); background:var(--amber-dim); color:var(--ink);}
+  .manifest-tab-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:inherit; opacity:0.75;
+  }
+
   .completed-toggle{
     display:flex; align-items:center; gap:8px; width:100%;
     background:none; border:none; padding:0; margin:6px 0 10px; cursor:pointer;
@@ -250,6 +264,7 @@
   .task-row{
     background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
     padding:12px 14px; margin-bottom:8px; position:relative; overflow:hidden;
+    cursor:pointer;
   }
   .task-row::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
@@ -258,7 +273,7 @@
   .task-row.status-in_progress::before{background:var(--cyan);}
   .task-row.status-delivered::before{background:var(--green);}
   .task-row.status-failed::before{background:var(--red);}
-  .task-row-top{display:flex; justify-content:space-between; gap:8px;}
+  .task-row-top{display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
   .task-row-item{font-family: 'IBM Plex Mono', monospace;font-size:14px; font-weight:400; color:var(--ink);}
   .task-row-badge{
     font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:9.5px;
@@ -270,6 +285,14 @@
   .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
   .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
   .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
+  .badge-queued{background:rgba(122,154,187,0.12); color:var(--ink-dim); border-color:var(--line);}
+  .task-row-chevron{
+    color:var(--ink-faint); font-size:11px; flex-shrink:0; margin-top:2px;
+    transition:transform 0.15s ease;
+  }
+  .task-row.expanded .task-row-chevron{transform:rotate(180deg);}
+  .task-row-detail{display:none;}
+  .task-row.expanded .task-row-detail{display:block;}
   .task-row-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
   .task-row-notes{
     font-size:12px; color:var(--ink-dim); margin-top:6px; padding:6px 9px;
@@ -280,7 +303,7 @@
     display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
     font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
   }
-  .task-row-actions{margin-top:8px; display:flex; gap:6px;}
+  .task-row-actions{margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;}
   .task-row-actions button{
     font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
     border-radius:5px; border:1px solid var(--line); background:var(--navy-1);
@@ -289,6 +312,7 @@
   .task-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
   .btn-delete-row{margin-left:auto;}
   .btn-delete-row:hover{border-color:var(--rose) !important; color:var(--rose) !important;}
+  .btn-queue-toggle:hover{border-color:var(--teal) !important; color:var(--teal) !important;}
   .empty-list{text-align:center; padding:32px 20px; color:var(--ink-faint); font-size:13px; font-family:'IBM Plex Mono',monospace;}
 
   .modal-backdrop{
@@ -308,11 +332,16 @@
     font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.04em;
     text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; display:block;
   }
+  .field-label-optional{text-transform:none; letter-spacing:0; color:var(--ink-faint);}
+  .field-hint{
+    font-size:11.5px; color:var(--ink-faint); margin:-10px 0 14px; line-height:1.4;
+  }
   .modal input, .modal select, .modal textarea{
     width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:6px;
     font-family:'IBM Plex Mono',monospace; font-size:13.5px; margin-bottom:14px;
     background:var(--navy-2); color:var(--ink);
   }
+  .modal input[type="date"]{color-scheme:dark;}
   .modal textarea{resize:vertical; min-height:60px; max-height:160px; line-height:1.4;}
   .modal input::placeholder, .modal textarea::placeholder{color:var(--ink-faint);}
   .modal input:focus, .modal select:focus, .modal textarea:focus{outline:none; border-color:var(--amber);}
@@ -502,8 +531,16 @@
       </div>
 
     <div class="list-section">
-      <div class="eyebrow" style="margin:6px 0 10px;">Active manifest</div>
+      <div class="manifest-tabs" id="manifest-tabs">
+        <button type="button" class="manifest-tab selected" data-tab="active">
+          Active <span class="manifest-tab-count" id="active-tab-count">0</span>
+        </button>
+        <button type="button" class="manifest-tab" data-tab="queued">
+          Queued <span class="manifest-tab-count" id="queued-tab-count">0</span>
+        </button>
+      </div>
       <div id="active-list"></div>
+      <div id="queued-list" style="display:none;"></div>
     </div>
     <div class="list-section">
       <button type="button" class="completed-toggle" id="completed-toggle">
@@ -556,6 +593,10 @@
 
     <label class="field-label">Notes</label>
     <textarea id="task-notes" placeholder="e.g. Call before arriving, leave with security if not home"></textarea>
+
+    <label class="field-label">Release date <span class="field-label-optional">(optional)</span></label>
+    <input type="date" id="task-release-date">
+    <div class="field-hint" id="release-date-hint">Task stays queued until this date, then moves to Active automatically.</div>
 
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
@@ -750,10 +791,10 @@ function renderRunnerStrip(){
   const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
 
   const activeCountFor = (uid) => Object.values(tasksById).filter(t =>
-    t.assignedTo === uid && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
+    t.assignedTo === uid && t.queued !== true && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
   ).length;
   const totalActive = Object.values(tasksById).filter(t =>
-    t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS
+    t.queued !== true && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
   ).length;
 
   document.getElementById("runner-strip-count").textContent = ids.length;
@@ -840,9 +881,40 @@ function subscribeTasks(){
   onSnapshot(q, (snap) => {
     tasksById = {};
     snap.forEach(d => tasksById[d.id] = { id: d.id, ...d.data() });
+    releaseDueTasks();
     renderTaskLists();
   });
 }
+
+// Queued tasks with a releaseDate ("YYYY-MM-DD") automatically move to
+// Active once that calendar date arrives — compared as local dates, not
+// exact timestamps, since there's no time component on the field. This
+// only fires while a dispatcher has the app open (no server-side cron),
+// so a task can sit queued a little past its date if nobody's looking;
+// it always catches up the moment the app is next opened or this check
+// next runs.
+let releaseCheckInFlight = false;
+async function releaseDueTasks(){
+  if (releaseCheckInFlight) return;
+  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
+  const due = Object.values(tasksById).filter(t =>
+    t.queued === true && t.releaseDate && t.releaseDate <= todayStr
+  );
+  if (due.length === 0) return;
+
+  releaseCheckInFlight = true;
+  try {
+    for (const t of due){
+      await updateDoc(doc(db, "tasks", t.id), { queued: false, updatedAt: serverTimestamp() });
+    }
+  } catch (e) {
+    console.error("Failed to auto-release scheduled task:", e);
+  } finally {
+    releaseCheckInFlight = false;
+  }
+}
+
+setInterval(releaseDueTasks, 60000);
 
 let searchQuery = "";
 const DONE_PAGE_SIZE = 15;
@@ -873,10 +945,9 @@ function groupDoneTasks(done){
 
 function renderHeaderStats(){
   const allTasks = Object.values(tasksById);
-  const activeCount = allTasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS).length;
-  const urgentCount = allTasks.filter(t =>
-    (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS) && t.urgency === "urgent"
-  ).length;
+  const isLiveActive = (t) => (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS) && t.queued !== true;
+  const activeCount = allTasks.filter(isLiveActive).length;
+  const urgentCount = allTasks.filter(t => isLiveActive(t) && t.urgency === "urgent").length;
   const runnerIds = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
   const onlineCount = runnerIds.filter(id => lastLocationAge(id) < STALE_LOCATION_MS).length;
 
@@ -908,7 +979,9 @@ function renderTaskLists(){
     });
   }
 
-  const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const activeAndQueued = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const active = activeAndQueued.filter(t => t.queued !== true);
+  const queued = activeAndQueued.filter(t => t.queued === true);
   const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
   done.sort((a, b) => {
     const aMs = (a.completedAt || a.createdAt)?.toMillis ? (a.completedAt || a.createdAt).toMillis() : 0;
@@ -919,6 +992,11 @@ function renderTaskLists(){
   document.getElementById("active-list").innerHTML = active.length
     ? active.map(taskRowHTML).join("")
     : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
+  document.getElementById("queued-list").innerHTML = queued.length
+    ? queued.map(taskRowHTML).join("")
+    : `<div class="empty-list">${searchQuery ? "No matching queued tasks." : "Nothing queued."}</div>`;
+  document.getElementById("active-tab-count").textContent = active.length;
+  document.getElementById("queued-tab-count").textContent = queued.length;
 
   document.getElementById("completed-count").textContent = done.length;
 
@@ -952,14 +1030,42 @@ function renderTaskLists(){
   }
 
   document.querySelectorAll("[data-reassign]").forEach(btn => {
-    btn.addEventListener("click", () => openReassignPrompt(btn.dataset.reassign));
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openReassignPrompt(btn.dataset.reassign); });
   });
   document.querySelectorAll("[data-delete]").forEach(btn => {
-    btn.addEventListener("click", () => deleteTask(btn.dataset.delete));
+    btn.addEventListener("click", (e) => { e.stopPropagation(); deleteTask(btn.dataset.delete); });
   });
   document.querySelectorAll("[data-edit]").forEach(btn => {
-    btn.addEventListener("click", () => openEditModal(btn.dataset.edit));
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openEditModal(btn.dataset.edit); });
   });
+  document.querySelectorAll("[data-queue-toggle]").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); toggleQueued(btn.dataset.queueToggle); });
+  });
+  document.querySelectorAll("[data-task-toggle]").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.dataset.taskToggle;
+      if (expandedTaskIds.has(id)) expandedTaskIds.delete(id);
+      else expandedTaskIds.add(id);
+      row.classList.toggle("expanded");
+    });
+  });
+}
+
+async function toggleQueued(taskId){
+  const t = tasksById[taskId];
+  if (!t) return;
+  const movingToQueued = !(t.queued === true);
+
+  const update = {
+    queued: movingToQueued,
+    updatedAt: serverTimestamp()
+  };
+  // Re-queuing clears any old release date — otherwise a past-due date
+  // would make releaseDueTasks() snap it right back to Active within the
+  // minute, silently undoing the manual move.
+  if (movingToQueued) update.releaseDate = null;
+
+  await updateDoc(doc(db, "tasks", taskId), update);
 }
 
 async function deleteTask(taskId){
@@ -1034,31 +1140,51 @@ function formatTaskDate(ts){
   return `${datePart}, ${timePart}`;
 }
 
+const expandedTaskIds = new Set();
+
+function formatReleaseDate(dateStr){
+  if (!dateStr) return null;
+  // Parse as local date (not UTC) so it matches what the dispatcher picked.
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function taskRowHTML(t){
   const assignee = employees[t.assignedTo]?.name || "Unassigned";
   const isUrgent = t.urgency === "urgent";
+  const isQueued = t.queued === true;
   const createdStr = formatTaskDate(t.createdAt);
   const completedStr = formatTaskDate(t.completedAt);
+  const releaseStr = formatReleaseDate(t.releaseDate);
   const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
+  const isExpanded = expandedTaskIds.has(t.id);
+
   return `
-    <div class="task-row status-${t.status}">
+    <div class="task-row status-${t.status} ${isExpanded ? 'expanded' : ''}" data-task-toggle="${t.id}">
       <div class="task-row-top">
         <div class="task-row-item">${escapeHTML(t.item || "Unnamed item")}</div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div style="display:flex; gap:6px; flex-shrink:0; align-items:flex-start;">
+          ${isQueued ? `<div class="task-row-badge badge-queued">Queued</div>` : ""}
           ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
           <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          <span class="task-row-chevron">▾</span>
         </div>
       </div>
-      <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
-      ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
-      <div class="task-row-dates">
-        ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
-        ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
-      </div>
-      <div class="task-row-actions">
-        <button data-edit="${t.id}">Edit</button>
-        ${t.status !== "delivered" ? `<button data-reassign="${t.id}">Reassign</button>` : ""}
-        <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
+      <div class="task-row-detail">
+        <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+        ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
+        <div class="task-row-dates">
+          ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
+          ${isQueued && releaseStr ? `<span>Releases ${releaseStr}</span>` : ""}
+          ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
+        </div>
+        <div class="task-row-actions">
+          <button data-edit="${t.id}">Edit</button>
+          ${!isDone ? `<button data-reassign="${t.id}">Reassign</button>` : ""}
+          ${!isDone ? `<button class="btn-queue-toggle" data-queue-toggle="${t.id}">${isQueued ? "Move to active" : "Move to queue"}</button>` : ""}
+          <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
+        </div>
       </div>
     </div>`;
 }
@@ -1123,6 +1249,7 @@ function resetTaskForm(){
   document.getElementById("task-item").value = "";
   document.getElementById("task-address").value = "";
   document.getElementById("task-notes").value = "";
+  document.getElementById("task-release-date").value = "";
   selectedUrgency = "normal";
   document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b.dataset.urgency === "normal"));
   if (document.getElementById("task-assignee").options.length) {
@@ -1130,12 +1257,18 @@ function resetTaskForm(){
   }
 }
 
+const DEFAULT_RELEASE_HINT = "Task stays queued until this date, then moves to Active automatically.";
+const REQUEUE_RELEASE_HINT = "This task is currently active. Setting a date here will move it back to Queued until then.";
+let editingTaskWasActive = false;
+
 function openCreateModal(){
   editingTaskId = null;
+  editingTaskWasActive = false;
   resetTaskForm();
   document.getElementById("modal-title").textContent = "New delivery";
   document.getElementById("modal-sub").textContent = "Assign an item to a runner.";
   document.getElementById("create-task").textContent = "Create task";
+  document.getElementById("release-date-hint").textContent = DEFAULT_RELEASE_HINT;
   backdrop.classList.add("open");
 }
 
@@ -1143,11 +1276,13 @@ function openEditModal(taskId){
   const t = tasksById[taskId];
   if (!t) return;
   editingTaskId = taskId;
+  editingTaskWasActive = t.queued !== true;
 
   document.getElementById("task-name").value = t.name || "";
   document.getElementById("task-item").value = t.item || "";
   document.getElementById("task-address").value = t.address || "";
   document.getElementById("task-notes").value = t.notes || "";
+  document.getElementById("task-release-date").value = t.releaseDate || "";
   document.getElementById("task-assignee").value = t.assignedTo || "";
 
   selectedUrgency = t.urgency === "urgent" ? "urgent" : "normal";
@@ -1156,10 +1291,23 @@ function openEditModal(taskId){
   document.getElementById("modal-title").textContent = "Edit delivery";
   document.getElementById("modal-sub").textContent = "Update this task's details.";
   document.getElementById("create-task").textContent = "Save changes";
+  document.getElementById("release-date-hint").textContent =
+    editingTaskWasActive ? REQUEUE_RELEASE_HINT : DEFAULT_RELEASE_HINT;
   backdrop.classList.add("open");
 }
 
 document.getElementById("open-new-task").addEventListener("click", openCreateModal);
+
+document.getElementById("task-release-date").addEventListener("input", (e) => {
+  const hintEl = document.getElementById("release-date-hint");
+  if (editingTaskWasActive && e.target.value){
+    hintEl.textContent = REQUEUE_RELEASE_HINT;
+  } else if (editingTaskWasActive && !e.target.value){
+    hintEl.textContent = "This task is currently active and will stay active.";
+  } else {
+    hintEl.textContent = DEFAULT_RELEASE_HINT;
+  }
+});
 document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
 
 document.getElementById("task-search").addEventListener("input", (e) => {
@@ -1177,6 +1325,15 @@ document.getElementById("completed-toggle").addEventListener("click", (e) => {
 document.getElementById("show-more-done").addEventListener("click", () => {
   donePageCount += DONE_PAGE_SIZE;
   renderTaskLists();
+});
+
+document.getElementById("manifest-tabs").addEventListener("click", (e) => {
+  const tabBtn = e.target.closest(".manifest-tab");
+  if (!tabBtn) return;
+  const tab = tabBtn.dataset.tab;
+  document.querySelectorAll(".manifest-tab").forEach(b => b.classList.toggle("selected", b === tabBtn));
+  document.getElementById("active-list").style.display = tab === "active" ? "block" : "none";
+  document.getElementById("queued-list").style.display = tab === "queued" ? "block" : "none";
 });
 
 const appEl = document.getElementById("app");
@@ -1202,6 +1359,7 @@ document.getElementById("create-task").addEventListener("click", async () => {
   const assignedTo = document.getElementById("task-assignee").value;
   const urgency = selectedUrgency;
   const notes = document.getElementById("task-notes").value.trim();
+  const releaseDate = document.getElementById("task-release-date").value || null;
 
   if (!item || !assignedTo){
     alert("Add an item and pick a runner before saving the task.");
@@ -1209,20 +1367,29 @@ document.getElementById("create-task").addEventListener("click", async () => {
   }
 
   if (editingTaskId){
-    await updateDoc(doc(db, "tasks", editingTaskId), {
-      name, item, address, assignedTo, urgency, notes,
+    const update = {
+      name, item, address, assignedTo, urgency, notes, releaseDate,
       updatedAt: serverTimestamp()
-    });
+    };
+    // Editing an active task to add a release date means "hold this until
+    // then" — so it has to actually move back to Queued, or the date would
+    // silently do nothing (releaseDueTasks only ever looks at queued tasks).
+    if (editingTaskWasActive && releaseDate){
+      update.queued = true;
+    }
+    await updateDoc(doc(db, "tasks", editingTaskId), update);
   } else {
     await addDoc(collection(db, "tasks"), {
-      name, item, address, assignedTo, urgency, notes,
+      name, item, address, assignedTo, urgency, notes, releaseDate,
       status: TASK_STATUS.PENDING,
+      queued: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
   }
 
   editingTaskId = null;
+  editingTaskWasActive = false;
   resetTaskForm();
   backdrop.classList.remove("open");
 });

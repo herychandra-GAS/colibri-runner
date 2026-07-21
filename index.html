@@ -237,6 +237,34 @@
   }
   .btn-show-more:hover{border-color:var(--amber); color:var(--ink);}
 
+  .runner-row{
+    display:flex; align-items:center; gap:10px; padding:10px 11px;
+    background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
+    margin-bottom:8px;
+  }
+  .runner-row-avatar{
+    width:30px;height:30px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;
+  }
+  .runner-row-name{flex:1; font-size:14px; font-weight:400; color:var(--ink); min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;font-family: 'IBM Plex Mono';}
+  .runner-row-actions{display:flex; gap:6px; flex-shrink:0;}
+  .runner-row-actions button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
+    border-radius:5px; border:1px solid var(--line); background:var(--navy-1);
+    color:var(--ink-dim); cursor:pointer;
+  }
+  .runner-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
+  .runner-row-actions .btn-delete-runner:hover{border-color:var(--rose) !important; color:var(--rose) !important;}
+  .btn-add-runner{
+    width:100%; margin-top:4px; padding:10px; border-radius:6px;
+    border:1px dashed var(--line); background:transparent; color:var(--ink-dim);
+    cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .btn-add-runner:hover{border-color:var(--amber); color:var(--ink);}
+
   .housekeeping-section{padding-bottom:22px;}
   .housekeeping-row{
     display:flex; align-items:center; gap:8px; margin-bottom:10px;
@@ -554,6 +582,18 @@
       </div>
     </div>
 
+    <div class="list-section">
+      <button type="button" class="completed-toggle" id="runners-toggle">
+        <span class="eyebrow" style="margin:0;">Manage runners</span>
+        <span class="completed-count" id="runners-count">0</span>
+        <span class="completed-chevron" id="runners-chevron">▾</span>
+      </button>
+      <div id="runners-wrap" class="done-list-wrap">
+        <div id="runners-list"></div>
+        <button type="button" class="btn-add-runner" id="add-runner-btn">+ Add runner</button>
+      </div>
+    </div>
+
     <div class="list-section housekeeping-section">
       <div class="eyebrow" style="margin:14px 0 10px;">Housekeeping</div>
       <div class="housekeeping-row">
@@ -565,6 +605,25 @@
       <div class="housekeeping-status" id="housekeeping-status"></div>
     </div>
   </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="runner-modal-backdrop">
+  <div class="modal">
+    <h2 class="display" id="runner-modal-title">Add runner</h2>
+    <p class="sub" id="runner-modal-sub">Create a name and PIN for this runner.</p>
+
+    <label class="field-label">Name</label>
+    <input id="runner-name-input" placeholder="e.g. Rafli">
+
+    <label class="field-label">PIN <span class="field-label-optional">(6 digits)</span></label>
+    <input id="runner-pin-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="e.g. 481920">
+    <div class="field-hint" id="runner-pin-hint">The runner will use this PIN to sign in on their phone.</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="runner-modal-cancel">Cancel</button>
+      <button class="btn-create" id="runner-modal-save">Save runner</button>
+    </div>
   </div>
 </div>
 
@@ -596,7 +655,7 @@
 
     <label class="field-label">Release date <span class="field-label-optional">(optional)</span></label>
     <input type="date" id="task-release-date">
-    <div class="field-hint" id="release-date-hint">Task stays queued until this date, then moves to Active automatically.</div>
+    <div class="field-hint" id="release-date-hint">Task stays queued until 8:30 AM on this date, then moves to Active automatically.</div>
 
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
@@ -641,7 +700,14 @@ const TASK_STATUS = {
   PENDING: "pending", IN_PROGRESS: "in_progress",
   DELIVERED: "delivered", FAILED: "failed"
 };
-const STALE_LOCATION_MS = 6 * 60 * 1000; // 6 min — allows for one missed 4-min ping cycle
+// Must match LocationPingReceiver.PING_INTERVAL_MS on the Android side.
+const PING_INTERVAL_MS = 4 * 60 * 1000;
+// A runner is only "offline" after missing ~10 consecutive pings — not on
+// a single delayed/batched one (Doze mode can push a ping late by a
+// couple minutes on its own). Logout also counts as offline: once a
+// runner logs out, pings stop firing entirely, so their last-seen time
+// simply ages past this window like any other silence.
+const STALE_LOCATION_MS = PING_INTERVAL_MS * 10;
 
 // Only these Google accounts may reach the dispatcher app at all.
 // Being on this list does not by itself grant dispatcher role — that
@@ -683,6 +749,19 @@ const employeeColor = {};
 function colorFor(uid){
   if (!employeeColor[uid]) employeeColor[uid] = courierColors[colorIdx++ % courierColors.length];
   return employeeColor[uid];
+}
+
+// Hashes a PIN with SHA-256 via the browser's built-in Web Crypto API — no
+// external library needed. This is a client-side check (see project notes):
+// hashing avoids storing PINs in plaintext, but a determined party with
+// direct Firestore access could still attempt to brute-force a 6-digit PIN
+// against the hash. Acceptable for this internal-team use case; upgrading
+// to server-side verification (Cloud Function) later wouldn't require any
+// UI changes.
+async function hashPin(pin){
+  const data = new TextEncoder().encode(pin);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function makeIcon(color, initial){
@@ -780,6 +859,7 @@ function subscribeEmployees(){
     employees = {};
     snap.forEach(d => employees[d.id] = { id: d.id, ...d.data() });
     renderRunnerStrip();
+    renderRunnersList();
     populateAssigneeSelect();
   });
 }
@@ -809,7 +889,7 @@ function renderRunnerStrip(){
     ids.map(id => {
       const e = employees[id];
       const initial = (e.name || "?").charAt(0).toUpperCase();
-      const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+      const isLive = isRunnerLive(id);
       const count = activeCountFor(id);
       return `
         <div class="runner-card ${selectedEmployeeId === id ? 'selected' : ''}" data-uid="${id}">
@@ -844,10 +924,19 @@ function populateAssigneeSelect(){
 }
 
 const locationUpdatedAt = {};
+const locationOnlineFlag = {}; // uid -> false when runner explicitly logged out; absent/true otherwise
 
 function lastLocationAge(uid){
   const t = locationUpdatedAt[uid];
   return t ? (Date.now() - t) : Infinity;
+}
+
+// Single source of truth for the "live" dot everywhere it's shown. A
+// runner is live if they haven't explicitly logged out AND a ping has
+// landed within the missed-ping tolerance window.
+function isRunnerLive(uid){
+  if (locationOnlineFlag[uid] === false) return false;
+  return lastLocationAge(uid) < STALE_LOCATION_MS;
 }
 
 function subscribeLocations(){
@@ -855,6 +944,7 @@ function subscribeLocations(){
     snap.forEach(d => {
       const data = d.data();
       const uid = d.id;
+      locationOnlineFlag[uid] = data.online !== false;
       if (!data.lat || !data.lng) return;
 
       locationUpdatedAt[uid] = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
@@ -872,7 +962,7 @@ function subscribeLocations(){
       }
     });
     // TEMP DEBUG — remove once background-tracking testing is complete.
-    window._debug = { employees, locationUpdatedAt, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
+    window._debug = { employees, locationUpdatedAt, locationOnlineFlag, isRunnerLive, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
     renderRunnerStrip();
     renderHeaderStats();
   });
@@ -889,19 +979,23 @@ function subscribeTasks(){
 }
 
 // Queued tasks with a releaseDate ("YYYY-MM-DD") automatically move to
-// Active once that calendar date arrives — compared as local dates, not
-// exact timestamps, since there's no time component on the field. This
-// only fires while a dispatcher has the app open (no server-side cron),
-// so a task can sit queued a little past its date if nobody's looking;
-// it always catches up the moment the app is next opened or this check
-// next runs.
+// Active once 8:30 AM local time on that date has passed — compared as
+// exact local timestamps (releaseDate at 08:30), not just calendar dates.
+// This only fires while a dispatcher has the app open (no server-side cron),
+// so a task can sit queued a little past 8:30 if nobody's looking; it always
+// catches up the moment the app is next opened or this check next runs.
+const RELEASE_HOUR_LOCAL = 8;
+const RELEASE_MINUTE_LOCAL = 30;
 let releaseCheckInFlight = false;
 async function releaseDueTasks(){
   if (releaseCheckInFlight) return;
-  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
-  const due = Object.values(tasksById).filter(t =>
-    t.queued === true && t.releaseDate && t.releaseDate <= todayStr
-  );
+  const now = new Date();
+  const due = Object.values(tasksById).filter(t => {
+    if (t.queued !== true || !t.releaseDate) return false;
+    const [y, m, d] = t.releaseDate.split("-").map(Number);
+    const releaseAt = new Date(y, m - 1, d, RELEASE_HOUR_LOCAL, RELEASE_MINUTE_LOCAL, 0, 0);
+    return now >= releaseAt;
+  });
   if (due.length === 0) return;
 
   releaseCheckInFlight = true;
@@ -951,7 +1045,7 @@ function renderHeaderStats(){
   const activeCount = allTasks.filter(isLiveActive).length;
   const urgentCount = allTasks.filter(t => isLiveActive(t) && t.urgency === "urgent").length;
   const runnerIds = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
-  const onlineCount = runnerIds.filter(id => lastLocationAge(id) < STALE_LOCATION_MS).length;
+  const onlineCount = runnerIds.filter(id => isRunnerLive(id)).length;
 
   document.getElementById("header-stats").innerHTML = `
     <div class="header-stat"><strong>${activeCount}</strong> active</div>
@@ -1082,6 +1176,122 @@ async function deleteTask(taskId){
   }
 }
 
+function renderRunnersList(){
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  document.getElementById("runners-count").textContent = ids.length;
+
+  const listEl = document.getElementById("runners-list");
+  listEl.innerHTML = ids.length
+    ? ids.map(id => {
+        const e = employees[id];
+        const initial = (e.name || "?").charAt(0).toUpperCase();
+        return `
+          <div class="runner-row">
+            <div class="runner-row-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
+            <div class="runner-row-name">${escapeHTML(e.name || "Unnamed runner")}</div>
+            <div class="runner-row-actions">
+              <button data-edit-runner="${id}">Edit</button>
+              <button class="btn-delete-runner" data-delete-runner="${id}">Delete</button>
+            </div>
+          </div>`;
+      }).join("")
+    : `<div class="empty-list">No runners yet.</div>`;
+
+  listEl.querySelectorAll("[data-edit-runner]").forEach(btn => {
+    btn.addEventListener("click", () => openRunnerModal(btn.dataset.editRunner));
+  });
+  listEl.querySelectorAll("[data-delete-runner]").forEach(btn => {
+    btn.addEventListener("click", () => deleteRunner(btn.dataset.deleteRunner));
+  });
+}
+
+async function deleteRunner(runnerId){
+  const name = employees[runnerId]?.name || "this runner";
+  if (!confirm(`Delete "${name}"? They won't be able to sign in anymore. This can't be undone.`)) return;
+  try {
+    await deleteDoc(doc(db, "employees", runnerId));
+  } catch (e) {
+    console.error("Failed to delete runner:", e);
+    alert("Couldn't delete that runner — check your connection and try again.");
+  }
+}
+
+const runnerBackdrop = document.getElementById("runner-modal-backdrop");
+let editingRunnerId = null;
+
+function openRunnerModal(runnerId){
+  editingRunnerId = runnerId || null;
+  const nameInput = document.getElementById("runner-name-input");
+  const pinInput = document.getElementById("runner-pin-input");
+  const hintEl = document.getElementById("runner-pin-hint");
+
+  if (editingRunnerId){
+    const e = employees[editingRunnerId];
+    nameInput.value = e?.name || "";
+    pinInput.value = "";
+    document.getElementById("runner-modal-title").textContent = "Edit runner";
+    document.getElementById("runner-modal-sub").textContent = "Update this runner's name or PIN.";
+    hintEl.textContent = "Leave blank to keep their current PIN unchanged.";
+  } else {
+    nameInput.value = "";
+    pinInput.value = "";
+    document.getElementById("runner-modal-title").textContent = "Add runner";
+    document.getElementById("runner-modal-sub").textContent = "Create a name and PIN for this runner.";
+    hintEl.textContent = "The runner will use this PIN to sign in on their phone.";
+  }
+  runnerBackdrop.classList.add("open");
+}
+
+document.getElementById("add-runner-btn").addEventListener("click", () => openRunnerModal(null));
+document.getElementById("runner-modal-cancel").addEventListener("click", () => {
+  runnerBackdrop.classList.remove("open");
+});
+
+// Only digits, capped at 6 characters, while typing.
+document.getElementById("runner-pin-input").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+});
+
+document.getElementById("runner-modal-save").addEventListener("click", async () => {
+  const name = document.getElementById("runner-name-input").value.trim();
+  const pin = document.getElementById("runner-pin-input").value.trim();
+
+  if (!name){
+    alert("Enter a name for this runner.");
+    return;
+  }
+  if (!editingRunnerId && pin.length !== 6){
+    alert("PIN must be exactly 6 digits.");
+    return;
+  }
+  if (pin && pin.length !== 6){
+    alert("PIN must be exactly 6 digits (or leave blank to keep the current one).");
+    return;
+  }
+
+  const update = { name, role: "runner", updatedAt: serverTimestamp() };
+  if (pin) update.pinHash = await hashPin(pin);
+
+  try {
+    if (editingRunnerId){
+      await updateDoc(doc(db, "employees", editingRunnerId), update);
+    } else {
+      update.createdAt = serverTimestamp();
+      await addDoc(collection(db, "employees"), update);
+    }
+    runnerBackdrop.classList.remove("open");
+  } catch (e) {
+    console.error("Failed to save runner:", e);
+    alert("Couldn't save that runner — check your connection and try again.");
+  }
+});
+
+document.getElementById("runners-toggle").addEventListener("click", (e) => {
+  const wrap = document.getElementById("runners-wrap");
+  const isOpen = wrap.classList.toggle("open");
+  e.currentTarget.classList.toggle("open", isOpen);
+});
+
 document.getElementById("housekeeping-run").addEventListener("click", async () => {
   const weeksInput = document.getElementById("housekeeping-weeks");
   const statusEl = document.getElementById("housekeeping-status");
@@ -1210,7 +1420,7 @@ async function openReassignPrompt(taskId){
     ? ids.map(id => {
         const e = employees[id];
         const initial = (e.name || "?").charAt(0).toUpperCase();
-        const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+        const isLive = isRunnerLive(id);
         const isCurrent = id === t.assignedTo;
         return `
           <button type="button" class="reassign-option ${isCurrent ? 'current' : ''}" data-assign-id="${id}">
@@ -1259,7 +1469,7 @@ function resetTaskForm(){
   }
 }
 
-const DEFAULT_RELEASE_HINT = "Task stays queued until this date, then moves to Active automatically.";
+const DEFAULT_RELEASE_HINT = "Task stays queued until 8:30 AM on this date, then moves to Active automatically.";
 const REQUEUE_RELEASE_HINT = "This task is currently active. Setting a date here will move it back to Queued until then.";
 let editingTaskWasActive = false;
 

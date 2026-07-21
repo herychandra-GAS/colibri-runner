@@ -641,7 +641,7 @@ const TASK_STATUS = {
   PENDING: "pending", IN_PROGRESS: "in_progress",
   DELIVERED: "delivered", FAILED: "failed"
 };
-const STALE_LOCATION_MS = 90000;
+const STALE_LOCATION_MS = 6 * 60 * 1000; // 6 min — allows for one missed 4-min ping cycle
 
 // Only these Google accounts may reach the dispatcher app at all.
 // Being on this list does not by itself grant dispatcher role — that

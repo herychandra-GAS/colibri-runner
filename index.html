@@ -924,7 +924,6 @@ function populateAssigneeSelect(){
 }
 
 const locationUpdatedAt = {};
-const locationOnlineFlag = {}; // uid -> false when runner explicitly logged out; absent/true otherwise
 
 function lastLocationAge(uid){
   const t = locationUpdatedAt[uid];
@@ -932,10 +931,11 @@ function lastLocationAge(uid){
 }
 
 // Single source of truth for the "live" dot everywhere it's shown. A
-// runner is live if they haven't explicitly logged out AND a ping has
-// landed within the missed-ping tolerance window.
+// runner is live if a ping has landed within the missed-ping tolerance
+// window. (There's no explicit-logout signal from the Android app yet —
+// if that's added later, it should set `online: false` on the
+// locations/{uid} doc and this function should check it here.)
 function isRunnerLive(uid){
-  if (locationOnlineFlag[uid] === false) return false;
   return lastLocationAge(uid) < STALE_LOCATION_MS;
 }
 
@@ -944,7 +944,6 @@ function subscribeLocations(){
     snap.forEach(d => {
       const data = d.data();
       const uid = d.id;
-      locationOnlineFlag[uid] = data.online !== false;
       if (!data.lat || !data.lng) return;
 
       locationUpdatedAt[uid] = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
@@ -962,7 +961,7 @@ function subscribeLocations(){
       }
     });
     // TEMP DEBUG — remove once background-tracking testing is complete.
-    window._debug = { employees, locationUpdatedAt, locationOnlineFlag, isRunnerLive, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
+    window._debug = { employees, locationUpdatedAt, isRunnerLive, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
     renderRunnerStrip();
     renderHeaderStats();
   });

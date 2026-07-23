@@ -314,6 +314,21 @@
   .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
   .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
   .badge-queued{background:rgba(122,154,187,0.12); color:var(--ink-dim); border-color:var(--line);}
+  .btn-notify-bell{
+    font-size:11px; padding:3px 6px; border-radius:4px; height:fit-content;
+    background:rgba(240,165,0,0.1); color:var(--amber); border:1px solid rgba(240,165,0,0.35);
+    cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .btn-notify-bell:hover{background:rgba(240,165,0,0.22); border-color:var(--amber);}
+  .btn-notify-bell:disabled{opacity:0.45; cursor:default; background:rgba(122,154,187,0.12); color:var(--ink-dim); border-color:var(--line);}
+  .btn-notify-bell.needs-notify{
+    background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.5);
+    animation:bell-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes bell-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(251,113,133,0.35);}
+    50%{box-shadow:0 0 0 4px rgba(251,113,133,0);}
+  }
   .task-row-chevron{
     color:var(--ink-faint); font-size:11px; flex-shrink:0; margin-top:2px;
     transition:transform 0.15s ease;
@@ -696,6 +711,12 @@ const firebaseConfig = {
   messagingSenderId: "178686518201",
   appId: "1:178686518201:web:f452fa0d0d4673bbee0c68"
 };
+// Relay that safely holds the Firebase service-account credential needed to
+// call FCM's v1 send API — that credential can't live in this client-side
+// file, so the dispatcher calls this small proxy instead. See the
+// colibri-push-relay project for the relay's own source.
+const PUSH_RELAY_URL = "https://colibri-push-relay.colibrirunner.workers.dev";
+const PUSH_RELAY_SECRET = "colibri-relay-x7k2m9p4q1z8";
 const TASK_STATUS = {
   PENDING: "pending", IN_PROGRESS: "in_progress",
   DELIVERED: "delivered", FAILED: "failed"
@@ -924,6 +945,7 @@ function populateAssigneeSelect(){
 }
 
 const locationUpdatedAt = {};
+const locationOnlineFlag = {}; // uid -> false when runner explicitly logged out; absent/true otherwise
 
 function lastLocationAge(uid){
   const t = locationUpdatedAt[uid];
@@ -931,11 +953,10 @@ function lastLocationAge(uid){
 }
 
 // Single source of truth for the "live" dot everywhere it's shown. A
-// runner is live if a ping has landed within the missed-ping tolerance
-// window. (There's no explicit-logout signal from the Android app yet —
-// if that's added later, it should set `online: false` on the
-// locations/{uid} doc and this function should check it here.)
+// runner is live if they haven't explicitly logged out AND a ping has
+// landed within the missed-ping tolerance window.
 function isRunnerLive(uid){
+  if (locationOnlineFlag[uid] === false) return false;
   return lastLocationAge(uid) < STALE_LOCATION_MS;
 }
 
@@ -944,6 +965,7 @@ function subscribeLocations(){
     snap.forEach(d => {
       const data = d.data();
       const uid = d.id;
+      locationOnlineFlag[uid] = data.online !== false;
       if (!data.lat || !data.lng) return;
 
       locationUpdatedAt[uid] = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
@@ -961,7 +983,7 @@ function subscribeLocations(){
       }
     });
     // TEMP DEBUG — remove once background-tracking testing is complete.
-    window._debug = { employees, locationUpdatedAt, isRunnerLive, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
+    window._debug = { employees, locationUpdatedAt, locationOnlineFlag, isRunnerLive, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs, courierMarkers, map };
     renderRunnerStrip();
     renderHeaderStats();
   });
@@ -1136,6 +1158,23 @@ function renderTaskLists(){
   document.querySelectorAll("[data-queue-toggle]").forEach(btn => {
     btn.addEventListener("click", (e) => { e.stopPropagation(); toggleQueued(btn.dataset.queueToggle); });
   });
+  document.querySelectorAll("[data-notify]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const taskId = btn.dataset.notify;
+      const t = tasksById[taskId];
+      if (!t || !t.assignedTo) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "…";
+      const result = await sendJobNotification(t.assignedTo, t);
+      btn.textContent = result.ok ? "✓" : "✕";
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.disabled = false;
+      }, 1500);
+    });
+  });
   document.querySelectorAll("[data-task-toggle]").forEach(row => {
     row.addEventListener("click", () => {
       const id = row.dataset.taskToggle;
@@ -1144,6 +1183,54 @@ function renderTaskLists(){
       row.classList.toggle("expanded");
     });
   });
+}
+
+// Sends a "new job" push notification to a runner via the relay, and
+// records notifiedAt on the task so the UI can show whether a given task
+// has ever actually been pushed — this matters specifically for
+// auto-released tasks (releaseDueTasks), which reach Active with no push
+// sent at all, and would otherwise be visually identical to a task that
+// was manually activated (and so already auto-pushed) or already
+// re-notified via the bell. Silently no-ops (rather than throwing) if the
+// runner has no fcmToken on file yet (e.g. hasn't logged into the Android
+// app since the push feature shipped) — the dispatcher UI still works
+// fully without push, this is additive.
+async function sendJobNotification(runnerUid, task){
+  const runner = employees[runnerUid];
+  if (!runner || !runner.fcmToken){
+    console.warn("No fcmToken on file for runner", runnerUid, "— skipping push.");
+    return { ok: false, reason: "no_token" };
+  }
+
+  const isUrgent = task && task.urgency === "urgent";
+  const title = isUrgent ? "🔴 Urgent delivery" : "New delivery";
+  let message = "You have a new task waiting";
+  if (task && task.item){
+    message = task.name ? `${task.name} — ${task.item}` : task.item;
+  }
+
+  try {
+    const res = await fetch(PUSH_RELAY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Relay-Secret": PUSH_RELAY_SECRET
+      },
+      body: JSON.stringify({ token: runner.fcmToken, title, message })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok){
+      console.warn("Push relay returned an error:", data);
+      return { ok: false, reason: data.error || "relay_error" };
+    }
+    if (task && task.id){
+      updateDoc(doc(db, "tasks", task.id), { notifiedAt: serverTimestamp() }).catch(() => {});
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn("Failed to reach push relay:", e);
+    return { ok: false, reason: "network_error" };
+  }
 }
 
 async function toggleQueued(taskId){
@@ -1161,6 +1248,14 @@ async function toggleQueued(taskId){
   if (movingToQueued) update.releaseDate = null;
 
   await updateDoc(doc(db, "tasks", taskId), update);
+
+  // Manually moving a task to active is the "immediate push" trigger per
+  // the notification design — auto-released tasks (releaseDueTasks) do
+  // NOT push automatically; those just get the bell/scheduled treatment
+  // until a dispatcher clicks to notify.
+  if (!movingToQueued && t.assignedTo){
+    sendJobNotification(t.assignedTo, t);
+  }
 }
 
 async function deleteTask(taskId){
@@ -1370,6 +1465,13 @@ function taskRowHTML(t){
   const releaseStr = formatReleaseDate(t.releaseDate);
   const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
   const isExpanded = expandedTaskIds.has(t.id);
+  // True for a task that's active (not queued) but has never actually been
+  // pushed — the case that matters here is an auto-released task
+  // (releaseDueTasks sets queued:false directly, with no push sent), which
+  // would otherwise look identical to a manually-activated task that
+  // already auto-pushed. Not meaningful for queued tasks — those haven't
+  // been pushed yet by design, that's expected and not something to flag.
+  const needsNotify = !isQueued && !isDone && t.assignedTo && !t.notifiedAt;
 
   return `
     <div class="task-row status-${t.status} ${isExpanded ? 'expanded' : ''}" data-task-toggle="${t.id}">
@@ -1379,6 +1481,7 @@ function taskRowHTML(t){
           ${isQueued ? `<div class="task-row-badge badge-queued">Queued</div>` : ""}
           ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
           <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          ${!isDone && t.assignedTo ? `<button type="button" class="btn-notify-bell${needsNotify ? " needs-notify" : ""}" data-notify="${t.id}" title="${isQueued ? "Push notify now" : (needsNotify ? "Not yet notified — click to push" : "Re-notify runner")}">🔔</button>` : ""}
           <span class="task-row-chevron">▾</span>
         </div>
       </div>

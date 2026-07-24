@@ -440,7 +440,11 @@
   .courier-label{
     font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px;
     background:var(--navy-1); color:var(--ink); padding:2px 6px; border-radius:4px;
-    border:1px solid var(--line); white-space:nowrap;
+    border:1px solid var(--line); white-space:nowrap; text-align:center;
+  }
+  .courier-label-time{
+    font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:9px;
+    color:var(--ink-dim); letter-spacing:0.02em;
   }
 
   .leaflet-control-zoom a{
@@ -960,6 +964,16 @@ function isRunnerLive(uid){
   return lastLocationAge(uid) < STALE_LOCATION_MS;
 }
 
+// Formats a plain millisecond timestamp (what locationUpdatedAt stores) for
+// the marker hover tooltip.
+function formatLastSeen(ms){
+  if (!ms) return "Unknown";
+  const d = new Date(ms);
+  const datePart = d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
 function subscribeLocations(){
   onSnapshot(collection(db, "locations"), (snap) => {
     snap.forEach(d => {
@@ -973,13 +987,15 @@ function subscribeLocations(){
       const name = employees[uid]?.name || "Runner";
       const initial = name.charAt(0).toUpperCase();
       const latlng = [data.lat, data.lng];
+      const tooltipHTML = `${escapeHTML(name)}<br><span class="courier-label-time">${escapeHTML(formatLastSeen(locationUpdatedAt[uid]))}</span>`;
 
       if (courierMarkers[uid]){
         courierMarkers[uid].setLatLng(latlng);
+        courierMarkers[uid].setTooltipContent(tooltipHTML);
       } else {
         courierMarkers[uid] = L.marker(latlng, { icon: makeIcon(colorFor(uid), initial) })
           .addTo(map)
-          .bindTooltip(name, { direction: "top", offset: [0,-28], className: "courier-label" });
+          .bindTooltip(tooltipHTML, { direction: "top", offset: [0,-28], className: "courier-label" });
       }
     });
     renderRunnerStrip();
@@ -1463,13 +1479,15 @@ function taskRowHTML(t){
   const releaseStr = formatReleaseDate(t.releaseDate);
   const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
   const isExpanded = expandedTaskIds.has(t.id);
-  // True for a task that's active (not queued) but has never actually been
-  // pushed — the case that matters here is an auto-released task
-  // (releaseDueTasks sets queued:false directly, with no push sent), which
-  // would otherwise look identical to a manually-activated task that
-  // already auto-pushed. Not meaningful for queued tasks — those haven't
-  // been pushed yet by design, that's expected and not something to flag.
-  const needsNotify = !isQueued && !isDone && t.assignedTo && !t.notifiedAt;
+  // Bell only makes sense for Active tasks — a queued task hasn't reached
+  // the runner's attention yet (waiting on a release date or a manual
+  // move), so "notify" is premature until it's actually live. needsNotify
+  // flags an active task that's never been pushed at all — the case that
+  // matters here is an auto-released task (releaseDueTasks sets
+  // queued:false directly, with no push sent), which would otherwise look
+  // identical to a manually-activated task that already auto-pushed.
+  const showBell = !isQueued && !isDone && t.assignedTo;
+  const needsNotify = showBell && !t.notifiedAt;
 
   return `
     <div class="task-row status-${t.status} ${isExpanded ? 'expanded' : ''}" data-task-toggle="${t.id}">
@@ -1479,7 +1497,7 @@ function taskRowHTML(t){
           ${isQueued ? `<div class="task-row-badge badge-queued">Queued</div>` : ""}
           ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
           <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
-          ${!isDone && t.assignedTo ? `<button type="button" class="btn-notify-bell${needsNotify ? " needs-notify" : ""}" data-notify="${t.id}" title="${isQueued ? "Push notify now" : (needsNotify ? "Not yet notified — click to push" : "Re-notify runner")}">🔔</button>` : ""}
+          ${showBell ? `<button type="button" class="btn-notify-bell${needsNotify ? " needs-notify" : ""}" data-notify="${t.id}" title="${needsNotify ? "Not yet notified — click to push" : "Re-notify runner"}">🔔</button>` : ""}
           <span class="task-row-chevron">▾</span>
         </div>
       </div>

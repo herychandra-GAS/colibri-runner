@@ -346,9 +346,6 @@
     display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
     font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
   }
-  .task-row-delivered-loc{margin-top:6px; font-size:11px;}
-  .task-row-delivered-loc a{color:var(--teal); text-decoration:none;}
-  .task-row-delivered-loc a:hover{text-decoration:underline;}
   .task-row-actions{margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;}
   .task-row-actions button{
     font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
@@ -1512,9 +1509,6 @@ function taskRowHTML(t){
           ${isQueued && releaseStr ? `<span>Releases ${releaseStr}</span>` : ""}
           ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
         </div>
-        ${t.status === TASK_STATUS.DELIVERED && t.deliveredLat && t.deliveredLng
-          ? `<div class="task-row-delivered-loc"><a href="https://www.google.com/maps?q=${t.deliveredLat},${t.deliveredLng}" target="_blank" rel="noopener">📍 View delivery location</a></div>`
-          : ""}
         <div class="task-row-actions">
           <button data-edit="${t.id}">Edit</button>
           ${!isDone ? `<button data-reassign="${t.id}">Reassign</button>` : ""}

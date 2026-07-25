@@ -346,6 +346,12 @@
     display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
     font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
   }
+  .task-row-delivered-loc{
+    margin-top:6px; font-size:11px; font-family:'IBM Plex Mono',monospace;
+    background:none; border:none; color:var(--teal); cursor:pointer; padding:0;
+    display:block; text-align:left;
+  }
+  .task-row-delivered-loc:hover{text-decoration:underline;}
   .task-row-actions{margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;}
   .task-row-actions button{
     font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
@@ -974,6 +980,14 @@ function formatLastSeen(ms){
   return `${datePart}, ${timePart}`;
 }
 
+// While a delivery location is being temporarily shown for a runner (see
+// showDeliveryLocationOnMap), live position updates for that same runner
+// are held back from moving the marker — otherwise a routine ping arriving
+// during the temporary display would immediately snap the marker back to
+// the runner's current position, defeating the point of showing where a
+// past delivery happened.
+const deliveryLocationOverride = new Set();
+
 function subscribeLocations(){
   onSnapshot(collection(db, "locations"), (snap) => {
     snap.forEach(d => {
@@ -990,8 +1004,10 @@ function subscribeLocations(){
       const tooltipHTML = `${escapeHTML(name)}<br><span class="courier-label-time">${escapeHTML(formatLastSeen(locationUpdatedAt[uid]))}</span>`;
 
       if (courierMarkers[uid]){
-        courierMarkers[uid].setLatLng(latlng);
-        courierMarkers[uid].setTooltipContent(tooltipHTML);
+        if (!deliveryLocationOverride.has(uid)){
+          courierMarkers[uid].setLatLng(latlng);
+          courierMarkers[uid].setTooltipContent(tooltipHTML);
+        }
       } else {
         courierMarkers[uid] = L.marker(latlng, { icon: makeIcon(colorFor(uid), initial) })
           .addTo(map)
@@ -1003,14 +1019,85 @@ function subscribeLocations(){
   });
 }
 
+const DELIVERY_LOCATION_DISPLAY_MS = 6000;
+
+// Temporarily moves a runner's marker to a past delivery coordinate, pans
+// the map to it, and restores the marker to the runner's real live
+// position afterward. Only ever touches the map/marker — never writes
+// anything to Firestore, and never affects the runner's actual tracked
+// location data.
+function showDeliveryLocationOnMap(uid, lat, lng){
+  const marker = courierMarkers[uid];
+  if (!marker || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+  deliveryLocationOverride.add(uid);
+  marker.setLatLng([lat, lng]);
+  marker.setTooltipContent(`${escapeHTML(employees[uid]?.name || "Runner")}<br><span class="courier-label-time">Delivered here</span>`);
+  marker.openTooltip();
+  map.panTo([lat, lng]);
+
+  setTimeout(() => {
+    deliveryLocationOverride.delete(uid);
+    // Snap back to wherever the runner actually is right now, rather than
+    // waiting for the next live ping — locationUpdatedAt/courierMarkers
+    // itself doesn't store raw lat/lng, so re-read the doc directly.
+    getDoc(doc(db, "locations", uid)).then(snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (!data.lat || !data.lng) return;
+      marker.setLatLng([data.lat, data.lng]);
+      const name = employees[uid]?.name || "Runner";
+      marker.setTooltipContent(`${escapeHTML(name)}<br><span class="courier-label-time">${escapeHTML(formatLastSeen(locationUpdatedAt[uid]))}</span>`);
+    }).catch(() => {});
+  }, DELIVERY_LOCATION_DISPLAY_MS);
+}
+
 function subscribeTasks(){
   const q = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snap) => {
     tasksById = {};
     snap.forEach(d => tasksById[d.id] = { id: d.id, ...d.data() });
     releaseDueTasks();
+    captureDeliveryLocations();
     renderTaskLists();
   });
+}
+
+// Copies a runner's current location onto a task the moment it's seen as
+// Delivered, entirely from the dispatcher side — the Android app is never
+// modified. This relies on the runner app already writing a fresh
+// locations/{uid} doc whenever it's open (true today, unrelated to this
+// feature), combined with the expected real-world sequence: runner opens
+// the app at the delivery stop (location updates), then taps Delivered
+// moments later. Since those are two separate writes rather than one
+// atomic operation, this is a best-effort snapshot of "wherever the runner
+// was around that time," not a guaranteed-exact capture.
+const deliveryLocationCaptureInFlight = new Set();
+async function captureDeliveryLocations(){
+  const candidates = Object.values(tasksById).filter(t =>
+    t.status === TASK_STATUS.DELIVERED &&
+    t.assignedTo &&
+    !t.deliveredLat &&
+    !deliveryLocationCaptureInFlight.has(t.id)
+  );
+  for (const t of candidates){
+    deliveryLocationCaptureInFlight.add(t.id);
+    try {
+      const locSnap = await getDoc(doc(db, "locations", t.assignedTo));
+      const locData = locSnap.exists() ? locSnap.data() : null;
+      if (locData && locData.lat && locData.lng){
+        await updateDoc(doc(db, "tasks", t.id), {
+          deliveredLat: locData.lat,
+          deliveredLng: locData.lng,
+          deliveredAt: locData.updatedAt || serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.warn("Couldn't capture delivery location for task", t.id, e);
+    } finally {
+      deliveryLocationCaptureInFlight.delete(t.id);
+    }
+  }
 }
 
 // Queued tasks with a releaseDate ("YYYY-MM-DD") automatically move to
@@ -1187,6 +1274,15 @@ function renderTaskLists(){
         btn.textContent = original;
         btn.disabled = false;
       }, 1500);
+    });
+  });
+  document.querySelectorAll("[data-show-delivery]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const taskId = btn.dataset.showDelivery;
+      const t = tasksById[taskId];
+      if (!t || !t.assignedTo) return;
+      showDeliveryLocationOnMap(t.assignedTo, parseFloat(btn.dataset.lat), parseFloat(btn.dataset.lng));
     });
   });
   document.querySelectorAll("[data-task-toggle]").forEach(row => {
@@ -1509,6 +1605,9 @@ function taskRowHTML(t){
           ${isQueued && releaseStr ? `<span>Releases ${releaseStr}</span>` : ""}
           ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
         </div>
+        ${t.status === TASK_STATUS.DELIVERED && t.deliveredLat && t.deliveredLng
+          ? `<button type="button" class="task-row-delivered-loc" data-show-delivery="${t.id}" data-lat="${t.deliveredLat}" data-lng="${t.deliveredLng}">📍 Delivered here${t.deliveredAt?.toMillis ? ` · ${formatLastSeen(t.deliveredAt.toMillis())}` : ""}</button>`
+          : ""}
         <div class="task-row-actions">
           <button data-edit="${t.id}">Edit</button>
           ${!isDone ? `<button data-reassign="${t.id}">Reassign</button>` : ""}

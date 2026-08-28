@@ -756,7 +756,7 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_2eyr_1_5c3b3a730e3fdeb6694bb1b9", {
   attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
   maxZoom: 20,
   subdomains: "abcd"

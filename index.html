@@ -769,7 +769,7 @@ map.createPane("labels");
 const labelPane = map.getPane("labels");
 labelPane.style.zIndex = 250;
 labelPane.style.pointerEvents = "none";
-labelPane.style.filter = "brightness(2.2) contrast(1.3)";
+labelPane.style.filter = "grayscale(1) brightness(1.8) contrast(1.2)";
 
 L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=cb1_2eyr_1_5c3b3a730e3fdeb6694bb1b9", {
   maxZoom: 20,
